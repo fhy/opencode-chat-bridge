@@ -15,9 +15,7 @@ RUN apt-get update && apt-get install -y curl && \
 
 # Install dependencies first (cached layer)
 COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile && \
-    cd node_modules/@matrix-org/matrix-sdk-crypto-nodejs && \
-    node download-lib.js
+RUN bun install --frozen-lockfile
 
 # Copy source files
 COPY src/ ./src/
