@@ -7,9 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-07-26
+
 ### Added
+- **Standalone Web chat** - Open `/chat` for a responsive full-page chat client
+  that reuses the embedded widget frontend.
+- **Safe Web Markdown rendering** - Web messages now support links, formatting,
+  code, and GFM tables while keeping HTML and unsafe URL schemes inert.
 - **All-tool output selector** - Set `toolMessages.showOutputFor` to `["*"]`
   to forward output from every tool. Empty selectors are ignored.
+- **Configurable verbose errors** - Operators can expose bounded error details
+  to chat users when diagnosing connector failures.
+
+### Changed
+- **Matrix crypto installation** - Bun now trusts the official Matrix native
+  crypto package's required postinstall script; the redundant Docker-only
+  download workaround was removed.
+- **Telegram rate-limit handling** - Outbound API calls and file uploads retry
+  HTTP or JSON 429 responses using Telegram's `retry_after`, with bounded delay
+  and retry exhaustion.
+
+### Fixed
+- **Empty ACP responses** - Matrix and Web retry failed or empty prompt turns
+  once with a fresh session and report a visible error if recovery fails.
+- **Duplicate editable messages** - Unchanged tool status and trace pages are no
+  longer sent as no-op edits, avoiding Telegram's `message is not modified`
+  error.
 
 ## [0.5.0] - 2026-07-19
 
