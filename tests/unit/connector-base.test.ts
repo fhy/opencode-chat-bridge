@@ -112,6 +112,35 @@ describe("tool message presentation", () => {
     expect(final).not.toContain("[Search test files]")
   })
 
+  test("skips editable updates when the rendered trace is unchanged", async () => {
+    const created: string[] = []
+    const updated: string[] = []
+    const presenter = new ToolActivityPresenter({
+      mode: "trace",
+      showCalls: true,
+      showArguments: false,
+      showOutputFor: [],
+      maxTraceEntries: 20,
+    }, {
+      create: async (text) => {
+        created.push(text)
+        return "message-1"
+      },
+      update: async (_messageId, text) => {
+        updated.push(text)
+      },
+    })
+
+    const revision = { toolCallId: "call-1", tool: "read", status: "running" as const }
+    presenter.handle(revision)
+    await presenter.flush()
+    presenter.handle(revision)
+    await presenter.flush()
+
+    expect(created).toHaveLength(1)
+    expect(updated).toHaveLength(0)
+  })
+
   test("continues long traces in additional editable messages", async () => {
     const created: string[] = []
     const updated: Array<{ id: string; text: string }> = []

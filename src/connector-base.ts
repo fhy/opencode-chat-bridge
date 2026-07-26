@@ -66,6 +66,7 @@ type ToolTraceEntry = {
 export class ToolActivityPresenter {
   private entries = new Map<string, ToolTraceEntry>()
   private messageIds: Array<string | null> = []
+  private renderedPages: Array<string | null> = []
   private dirtyPages = new Set<number>()
   private version = 0
   private renderedVersion = 0
@@ -123,8 +124,10 @@ export class ToolActivityPresenter {
           const text = this.render(page)
           const messageId = this.messageIds[page]
           if (messageId) {
+            if (this.renderedPages[page] === text) continue
             try {
               await this.adapter.update(messageId, text)
+              this.renderedPages[page] = text
             } catch (error) {
               // The original message may have expired, been deleted, or become
               // uneditable. Continue the presentation in a replacement message.
@@ -135,6 +138,7 @@ export class ToolActivityPresenter {
                 return
               }
               this.messageIds[page] = replacementId
+              this.renderedPages[page] = text
             }
           } else {
             const newMessageId = await this.adapter.create(text)
@@ -143,6 +147,7 @@ export class ToolActivityPresenter {
               return
             }
             this.messageIds[page] = newMessageId
+            this.renderedPages[page] = text
           }
         }
         this.renderedVersion = targetVersion
