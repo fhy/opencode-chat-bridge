@@ -173,7 +173,7 @@
       ".oc-msg-text{overflow-x:auto;}.oc-msg-text table{width:100%;border-collapse:collapse;font-size:13px;}.oc-msg-text th,.oc-msg-text td{padding:6px 8px;border:1px solid #cbd5e1;vertical-align:top;}.oc-msg-text th{font-weight:600;background:rgba(15,23,42,.06);}",
 
       // --- Activity ---
-      ".oc-activity{align-self:flex-start;font-size:12px;color:#6b7280;background:#f3f4f6;padding:6px 10px;border-left:3px solid #9ca3af;border-radius:4px;font-family:monospace;margin:4px 0;}",
+      ".oc-activity{align-self:flex-start;max-width:100%;font-size:12px;color:#6b7280;background:#f3f4f6;padding:6px 10px;border-left:3px solid #9ca3af;border-radius:4px;font-family:monospace;white-space:pre-wrap;overflow-wrap:anywhere;margin:4px 0;}",
       ".oc-tool-out{align-self:stretch;background:#1e293b;color:#e2e8f0;padding:10px 12px;border-radius:8px;font-family:monospace;font-size:12px;white-space:pre-wrap;word-break:break-all;max-height:200px;overflow-y:auto;margin:4px 0;}",
       ".oc-tool-details{align-self:stretch;margin:4px 0;}",
       ".oc-tool-details summary{font-size:12px;color:#64748b;cursor:pointer;padding:4px 0;user-select:none;}",

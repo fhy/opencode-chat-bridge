@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Web tool trace line breaks** - Activity and trace messages now preserve
+  newlines and safely wrap long lines in widget, embedded, and full-page modes.
+
 ## [0.6.0] - 2026-07-26
 
 ### Added

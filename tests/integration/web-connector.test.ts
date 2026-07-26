@@ -88,6 +88,7 @@ describe("web connector HTTP", () => {
     expect(js.indexOf("OpenCodeMessageRenderer")).toBeLessThan(js.indexOf("__ocWidgetLoaded"))
     expect(js).toContain("__ocWidgetLoaded")
     expect(js).toContain('case "activity_update"')
+    expect(js).toMatch(/\.oc-activity\{[^}]*white-space:pre-wrap[^}]*overflow-wrap:anywhere/)
   })
 
   test("GET /widget.js includes CORS header", async () => {
