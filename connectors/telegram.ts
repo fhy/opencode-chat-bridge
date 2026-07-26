@@ -131,13 +131,22 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 const MAX_429_RETRIES = 5
 /** Default retry_after fallback when Telegram omits it (seconds). */
 const DEFAULT_RETRY_AFTER = 5
+/** Avoid blocking a connector operation indefinitely on a malformed response. */
+const MAX_RETRY_AFTER = 300
+
+export function telegramRetryDelayMs(retryAfter?: number): number {
+  const seconds = typeof retryAfter === "number" && Number.isFinite(retryAfter)
+    ? Math.max(0, retryAfter)
+    : DEFAULT_RETRY_AFTER
+  return Math.min(seconds, MAX_RETRY_AFTER) * 1000
+}
 
 /**
  * Issue a JSON POST to the Telegram Bot API. Throws TelegramApiError on
  * non-OK responses. Automatically retries on HTTP 429 (rate-limit) errors,
  * honouring the server-provided `retry_after` delay.
  */
-async function tgApi<T = unknown>(method: string, body: Record<string, unknown> = {}): Promise<T> {
+export async function tgApi<T = unknown>(method: string, body: Record<string, unknown> = {}): Promise<T> {
   const url = `${TG_API_BASE}/${method}`
 
   for (let attempt = 0; ; attempt++) {
@@ -151,7 +160,7 @@ async function tgApi<T = unknown>(method: string, body: Record<string, unknown> 
     if (!res.ok) {
       const err = await telegramHttpError(res, `Telegram API ${method}`)
       if (res.status === 429 && attempt < MAX_429_RETRIES) {
-        const delay = (err.retryAfter ?? DEFAULT_RETRY_AFTER) * 1000
+        const delay = telegramRetryDelayMs(err.retryAfter)
         console.warn(`[tgApi] 429 on ${method} (attempt ${attempt + 1}/${MAX_429_RETRIES}), retrying in ${delay}ms`)
         await sleep(delay)
         continue
@@ -169,7 +178,7 @@ async function tgApi<T = unknown>(method: string, body: Record<string, unknown> 
       )
       // Telegram may return HTTP 200 with error_code 429
       if (json.error_code === 429 && attempt < MAX_429_RETRIES) {
-        const delay = (json.parameters?.retry_after ?? DEFAULT_RETRY_AFTER) * 1000
+        const delay = telegramRetryDelayMs(json.parameters?.retry_after)
         console.warn(`[tgApi] 429 on ${method} (attempt ${attempt + 1}/${MAX_429_RETRIES}), retrying in ${delay}ms`)
         await sleep(delay)
         continue
@@ -184,7 +193,7 @@ async function tgApi<T = unknown>(method: string, body: Record<string, unknown> 
  * Multipart upload for files (photo / document).
  * Automatically retries on HTTP 429 (rate-limit) errors.
  */
-async function tgUpload<T = unknown>(
+export async function tgUpload<T = unknown>(
   method: string,
   fields: Record<string, string>,
   filePath: string,
@@ -205,7 +214,7 @@ async function tgUpload<T = unknown>(
     if (!res.ok) {
       const err = await telegramHttpError(res, `Telegram upload ${method}`)
       if (res.status === 429 && attempt < MAX_429_RETRIES) {
-        const delay = (err.retryAfter ?? DEFAULT_RETRY_AFTER) * 1000
+        const delay = telegramRetryDelayMs(err.retryAfter)
         console.warn(`[tgUpload] 429 on ${method} (attempt ${attempt + 1}/${MAX_429_RETRIES}), retrying in ${delay}ms`)
         await sleep(delay)
         continue
@@ -220,7 +229,7 @@ async function tgUpload<T = unknown>(
         json.parameters?.retry_after
       )
       if (json.error_code === 429 && attempt < MAX_429_RETRIES) {
-        const delay = (json.parameters?.retry_after ?? DEFAULT_RETRY_AFTER) * 1000
+        const delay = telegramRetryDelayMs(json.parameters?.retry_after)
         console.warn(`[tgUpload] 429 on ${method} (attempt ${attempt + 1}/${MAX_429_RETRIES}), retrying in ${delay}ms`)
         await sleep(delay)
         continue
