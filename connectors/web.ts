@@ -18,6 +18,9 @@
  *   <script>window.OpenCodeWidget={mode:"embedded",container:"#chat"}</script>
  *   <script src="http://your-server:3420/widget.js"></script>
  *
+ * Standalone full-page chat:
+ *   http://your-server:3420/chat
+ *
  * Environment variables:
  *   WEB_PORT            - Server port (default: 3420)
  *   WEB_HOST            - Bind address (default: 0.0.0.0)
@@ -156,6 +159,7 @@ export class WebConnector extends BaseConnector<WebSession> {
     })
 
     this.log(`Server running on ${WEB_PUBLIC_URL}`)
+    this.log(`Full page:  ${WEB_PUBLIC_URL}/chat`)
     this.log(`Test page:  ${WEB_PUBLIC_URL}/test`)
     this.log(
       `Embed:  <script src="${WEB_PUBLIC_URL}/widget.js"><\/script>`,
@@ -237,6 +241,13 @@ export class WebConnector extends BaseConnector<WebSession> {
         },
         { headers: cors },
       )
+    }
+
+    // Standalone full-page chat
+    if (url.pathname === "/chat") {
+      return new Response(this.fullPage(), {
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      })
     }
 
     // Test page
@@ -720,6 +731,25 @@ export class WebConnector extends BaseConnector<WebSession> {
     } catch (err) {
       this.logError(`[WS] send failed (${clientId.slice(0, 8)}):`, err)
     }
+  }
+
+  private fullPage(): string {
+    return `<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <link rel="icon" href="data:,">
+  <title>OpenCode Chat</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+    #chat { width: 100%; height: 100vh; height: 100dvh; }
+  </style>
+</head><body>
+  <div id="chat"></div>
+  <script>window.OpenCodeWidget = { mode: "embedded", container: "#chat" }<\/script>
+  <script src="/widget.js"><\/script>
+</body></html>`
   }
 
   private testPage(mode: "widget" | "embedded"): string {

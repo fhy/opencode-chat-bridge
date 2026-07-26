@@ -6,6 +6,7 @@ Embeddable chat widget for any webpage. Serves a JavaScript widget via HTTP and 
 
 - **Widget** (default) — floating bubble in the corner, opens a popup chat panel
 - **Embedded** — fills a container element, no bubble, always visible
+- **Full page** — standalone chat served directly by the connector at `/chat`
 
 ## Quick Start
 
@@ -13,7 +14,7 @@ Embeddable chat widget for any webpage. Serves a JavaScript widget via HTTP and 
 bun connectors/web.ts
 ```
 
-Open `http://<your-ip>:3420/test` in a browser. The chat widget appears in the bottom-right corner.
+Open `http://<your-ip>:3420/chat` for the standalone full-page chat, or `/test` for the widget demo.
 
 ## Configuration
 
@@ -71,6 +72,16 @@ Add a single script tag to any page:
 </script>
 <script src="http://your-server:3420/widget.js"></script>
 ```
+
+### Full-Page Mode
+
+Open the standalone client directly:
+
+```text
+http://your-server:3420/chat
+```
+
+It reuses embedded mode in a viewport-sized container, so it has the same features and configuration defaults without maintaining a separate frontend.
 
 ### Widget Configuration
 
@@ -214,6 +225,7 @@ The connector serves two test pages:
 | Path | Description |
 |------|-------------|
 | `/widget.js` | The embeddable widget JavaScript |
+| `/chat` | Standalone full-page chat |
 | `/ws` | WebSocket endpoint (clients connect here) |
 | `/health` | JSON health check (`{"status":"ok",...}`) |
 | `/test` | Widget mode test page |

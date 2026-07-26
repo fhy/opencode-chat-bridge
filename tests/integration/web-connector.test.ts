@@ -98,6 +98,19 @@ describe("web connector HTTP", () => {
     expect(res.headers.get("access-control-allow-origin")).toBeTruthy()
   })
 
+  test("GET /chat returns a standalone full-page chat", async () => {
+    const res = await fetch(`${BASE}/chat`)
+    expect(res.status).toBe(200)
+    expect(res.headers.get("content-type")).toContain("text/html")
+
+    const html = await res.text()
+    expect(html).toContain('id="chat"')
+    expect(html).toContain('mode: "embedded"')
+    expect(html).toContain('container: "#chat"')
+    expect(html).toContain("height: 100dvh")
+    expect(html).toContain('src="/widget.js"')
+  })
+
   test("GET /test returns widget test page", async () => {
     const res = await fetch(`${BASE}/test`)
     expect(res.status).toBe(200)
