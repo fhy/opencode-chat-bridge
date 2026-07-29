@@ -96,6 +96,8 @@ Set `window.OpenCodeWidget` before loading the script:
     placeholder: "Ask me...",  // Input placeholder
     welcome: "Hello!",        // Welcome message (null = none)
     position: "right",         // Bubble position: "right" or "left"
+    connectTimeoutMs: 10000,    // Retry a stuck WebSocket connection
+    processingTimeoutMs: 330000, // Restore the UI after a lost response
     theme: {
       primary: "#2563eb",      // Bubble and send button color
       header: "#1e293b",       // Header background
@@ -258,7 +260,9 @@ The server binds to `0.0.0.0` by default (all interfaces). Check:
 
 ### Widget shows "Disconnected"
 
-The WebSocket connection dropped. The widget reconnects automatically with exponential backoff. Check server logs for errors.
+The WebSocket connection dropped. The widget reconnects automatically with exponential backoff. A connection that remains stuck in `Connecting...` is closed after 10 seconds and retried. Check server logs for errors.
+
+If a socket drops while a request is running and no terminal response arrives, the widget restores the send button after 5.5 minutes and displays a timeout message. Override these watchdogs with `connectTimeoutMs` and `processingTimeoutMs` in `window.OpenCodeWidget` when needed.
 
 ### Images not displaying
 

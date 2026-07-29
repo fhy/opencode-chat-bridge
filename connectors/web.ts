@@ -122,14 +122,15 @@ export class WebConnector extends BaseConnector<WebSession> {
     this.logStartup()
     await this.cleanupSessions()
 
-    // Load the safe message renderer before the widget runtime.
+    // Load pure state helpers and the safe renderer before the widget runtime.
+    const statePath = join(import.meta.dir, "web-widget-state.js")
     const rendererPath = join(import.meta.dir, "web-message-renderer.js")
     const widgetPath = join(import.meta.dir, "web-widget.js")
-    if (!existsSync(rendererPath) || !existsSync(widgetPath)) {
+    if (!existsSync(statePath) || !existsSync(rendererPath) || !existsSync(widgetPath)) {
       console.error(`Error: Widget source files not found in ${import.meta.dir}`)
       process.exit(1)
     }
-    this.widgetSource = [rendererPath, widgetPath]
+    this.widgetSource = [statePath, rendererPath, widgetPath]
       .map((filePath) => readFileSync(filePath, "utf-8"))
       .join("\n")
 
@@ -340,7 +341,8 @@ export class WebConnector extends BaseConnector<WebSession> {
 
   private onWsClose(ws: ServerWebSocket<WSData>): void {
     const { clientId } = ws.data
-    this.wsClients.delete(clientId)
+    // A replacement connection may already own this client ID.
+    if (this.wsClients.get(clientId) === ws) this.wsClients.delete(clientId)
     this.log(`[WS] Disconnected: ${clientId.slice(0, 12)}...`)
   }
 

@@ -16,6 +16,8 @@
  *     placeholder: "Type a message...",
  *     welcome: "Hello! How can I help?",
  *     position: "right",         // bubble side: "right" | "left"
+ *     connectTimeoutMs: 10000,
+ *     processingTimeoutMs: 330000,
  *     theme: {
  *       primary: "#2563eb",
  *       header: "#1e293b",
@@ -46,6 +48,9 @@
 
   var MODE = UC.mode || "widget" // "widget" | "embedded"
   var CONTAINER_SEL = UC.container || null
+  var WidgetState = window.OpenCodeWidgetState
+  var CONNECT_TIMEOUT_MS = WidgetState.positiveTimeout(UC.connectTimeoutMs, 10000)
+  var PROCESSING_TIMEOUT_MS = WidgetState.positiveTimeout(UC.processingTimeoutMs, 330000)
 
   var CFG = {
     title: UC.title || "OpenCode",
@@ -73,6 +78,8 @@
   var isProcessing = false
   var reconnAttempts = 0
   var reconnTimer = null
+  var connectTimer = null
+  var processingTimer = null
   var curBotEl = null // DOM element currently receiving streamed chunks
   var curBotText = "" // Raw streamed text; re-rendered after every chunk
   var curBotSupplementalText = "" // File labels previously included by textContent persistence
@@ -438,6 +445,7 @@
     showThinking()
     isProcessing = true
     sendBtn.disabled = true
+    armProcessingTimer()
 
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: "message", text: text }))
@@ -513,6 +521,39 @@
     if (statusEl) statusEl.textContent = t
   }
 
+  function clearConnectTimer() {
+    if (!connectTimer) return
+    clearTimeout(connectTimer)
+    connectTimer = null
+  }
+
+  function clearProcessingTimer() {
+    if (!processingTimer) return
+    clearTimeout(processingTimer)
+    processingTimer = null
+  }
+
+  function armProcessingTimer() {
+    clearProcessingTimer()
+    processingTimer = setTimeout(function () {
+      processingTimer = null
+      pendingMessage = null
+      hideThinking()
+      curBotEl = null
+      curBotText = ""
+      curBotSupplementalText = ""
+      isProcessing = false
+      sendBtn.disabled = false
+      addMsg("bot", "The request timed out. Please try again.")
+    }, PROCESSING_TIMEOUT_MS)
+  }
+
+  function finishProcessing() {
+    clearProcessingTimer()
+    isProcessing = false
+    sendBtn.disabled = false
+  }
+
   // ==========================================================================
   // WebSocket
   // ==========================================================================
@@ -523,31 +564,64 @@
   }
 
   function connect() {
+    clearConnectTimer()
+    if (reconnTimer) {
+      clearTimeout(reconnTimer)
+      reconnTimer = null
+    }
     var url = WS_URL + "?clientId=" + encodeURIComponent(clientId)
-    ws = new WebSocket(url)
+    var socket
+    try {
+      socket = new WebSocket(url)
+    } catch (e) {
+      ws = null
+      setStatus("Connection failed")
+      scheduleReconn()
+      return
+    }
+    ws = socket
+    setStatus(reconnAttempts > 0 ? "Reconnecting..." : "Connecting...")
 
-    ws.onopen = function () {
+    connectTimer = setTimeout(function () {
+      if (ws !== socket || socket.readyState !== WebSocket.CONNECTING) return
+      ws = null
+      setStatus("Connection timed out")
+      try { socket.close() } catch (e) {}
+      scheduleReconn()
+    }, CONNECT_TIMEOUT_MS)
+
+    socket.onopen = function () {
+      if (ws !== socket) {
+        socket.close()
+        return
+      }
+      clearConnectTimer()
       reconnAttempts = 0
       setStatus("Online")
       sendBtn.disabled = isProcessing ? true : false
 
       // Flush any message queued while disconnected
       if (pendingMessage) {
-        ws.send(JSON.stringify({ type: "message", text: pendingMessage }))
+        socket.send(JSON.stringify({ type: "message", text: pendingMessage }))
         pendingMessage = null
+        armProcessingTimer()
       }
     }
 
-    ws.onmessage = function (ev) {
+    socket.onmessage = function (ev) {
+      if (ws !== socket) return
       try { handleServer(JSON.parse(ev.data)) } catch (e) {}
     }
 
-    ws.onclose = function () {
+    socket.onclose = function () {
+      if (ws !== socket) return
+      clearConnectTimer()
+      ws = null
       setStatus("Disconnected")
       scheduleReconn()
     }
 
-    ws.onerror = function () { /* onclose fires next */ }
+    socket.onerror = function () { /* onclose fires next */ }
   }
 
   function scheduleReconn() {
@@ -566,12 +640,19 @@
   // ==========================================================================
 
   function handleServer(d) {
+    if (isProcessing && d.type !== "connected") armProcessingTimer()
+
     switch (d.type) {
 
       case "connected":
         clientId = d.clientId
-        // Server has no session for us -- clear stale history
-        if (!d.hasSession && messages.length > 0) {
+        // Clear only confirmed stale history. Preserve a request queued or in flight.
+        if (WidgetState.shouldClearHistory({
+          hasSession: d.hasSession,
+          messageCount: messages.length,
+          isProcessing: isProcessing,
+          hasPendingMessage: Boolean(pendingMessage),
+        })) {
           messages = []
           renderHistory()
         }
@@ -662,8 +743,7 @@
         curBotEl = null
         curBotText = ""
         curBotSupplementalText = ""
-        isProcessing = false
-        sendBtn.disabled = false
+        finishProcessing()
         break
 
       case "response": // non-streamed (commands)
@@ -673,8 +753,7 @@
         curBotEl = null
         curBotText = ""
         curBotSupplementalText = ""
-        isProcessing = false
-        sendBtn.disabled = false
+        finishProcessing()
         break
 
       case "error":
@@ -684,8 +763,7 @@
         curBotEl = null
         curBotText = ""
         curBotSupplementalText = ""
-        isProcessing = false
-        sendBtn.disabled = false
+        finishProcessing()
         break
     }
 

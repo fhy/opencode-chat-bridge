@@ -84,10 +84,14 @@ describe("web connector HTTP", () => {
 
     const js = await res.text()
     expect(js).toContain("OpenCode Chat Bridge")
+    expect(js).toContain("OpenCodeWidgetState")
     expect(js).toContain("OpenCodeMessageRenderer")
+    expect(js.indexOf("OpenCodeWidgetState")).toBeLessThan(js.indexOf("__ocWidgetLoaded"))
     expect(js.indexOf("OpenCodeMessageRenderer")).toBeLessThan(js.indexOf("__ocWidgetLoaded"))
     expect(js).toContain("__ocWidgetLoaded")
     expect(js).toContain('case "activity_update"')
+    expect(js).toContain("Connection timed out")
+    expect(js).toContain("The request timed out. Please try again.")
     expect(js).toMatch(/\.oc-activity\{[^}]*white-space:pre-wrap[^}]*overflow-wrap:anywhere/)
   })
 
@@ -176,6 +180,37 @@ describe("web connector WebSocket", () => {
     expect(msg.clientId.length).toBeGreaterThan(0)
     expect(msg.hasSession).toBe(false)
     ws.close()
+  })
+
+  test("keeps a replacement socket registered when the old socket closes", async () => {
+    const clientId = "test-replacement"
+    const first = new WebSocket(`ws://127.0.0.1:${PORT}/ws?clientId=${clientId}`)
+    await new Promise<void>((resolve, reject) => {
+      first.onmessage = () => resolve()
+      first.onerror = reject
+    })
+
+    const replacement = new WebSocket(`ws://127.0.0.1:${PORT}/ws?clientId=${clientId}`)
+    await new Promise<void>((resolve, reject) => {
+      replacement.onmessage = () => resolve()
+      replacement.onerror = reject
+    })
+
+    first.close()
+    await new Promise((resolve) => setTimeout(resolve, 25))
+    replacement.send(JSON.stringify({ type: "message", text: "/help" }))
+
+    const response = await new Promise<any>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error("replacement socket lost")), 1000)
+      replacement.onmessage = (event) => {
+        clearTimeout(timeout)
+        resolve(JSON.parse(event.data))
+      }
+    })
+
+    expect(response.type).toBe("response")
+    expect(response.text).toContain("OpenCode Chat Bridge")
+    replacement.close()
   })
 
   test("rejects invalid JSON", async () => {

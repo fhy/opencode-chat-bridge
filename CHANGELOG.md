@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Web tool trace line breaks** - Activity and trace messages now preserve
   newlines and safely wrap long lines in widget, embedded, and full-page modes.
+- **Web reconnect state** - Session confirmation no longer clears queued or
+  in-flight user messages. Connection and processing watchdogs recover stuck
+  status and disabled-send states, and stale sockets cannot unregister their
+  replacement connection.
 
 ## [0.6.0] - 2026-07-26
 
