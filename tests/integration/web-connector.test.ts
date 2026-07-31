@@ -113,6 +113,16 @@ describe("web connector HTTP", () => {
     expect(js).toMatch(/\.oc-activity\{[^}]*white-space:pre-wrap[^}]*overflow-wrap:anywhere/)
   })
 
+  test("GET /favicon.svg returns the bundled robot favicon", async () => {
+    const res = await fetch(`${BASE}/favicon.svg`)
+    expect(res.status).toBe(200)
+    expect(res.headers.get("content-type")).toContain("image/svg+xml")
+
+    const svg = await res.text()
+    expect(svg).toContain("<title>Robot</title>")
+    expect(svg).toContain("viewBox=\"0 0 64 64\"")
+  })
+
   test("GET /widget.js includes CORS header", async () => {
     const res = await fetch(`${BASE}/widget.js`, {
       headers: { Origin: "https://example.com" },
@@ -128,6 +138,7 @@ describe("web connector HTTP", () => {
 
     const html = await res.text()
     expect(html).toContain(`<title>${TEST_BOT_NAME} Chat</title>`)
+    expect(html).toContain('<link rel="icon" href="/favicon.svg" type="image/svg+xml">')
     expect(html).toContain('id="chat"')
     expect(html).toContain('mode: "embedded"')
     expect(html).toContain('container: "#chat"')

@@ -117,6 +117,7 @@ export class WebConnector extends BaseConnector<WebSession> {
   private server: Server | null = null
   private wsClients = new Map<string, ServerWebSocket<WSData>>()
   private widgetSource = ""
+  private faviconSource = ""
 
   constructor() {
     super({
@@ -140,7 +141,11 @@ export class WebConnector extends BaseConnector<WebSession> {
     const statePath = join(import.meta.dir, "web-widget-state.js")
     const rendererPath = join(import.meta.dir, "web-message-renderer.js")
     const widgetPath = join(import.meta.dir, "web-widget.js")
-    if (!existsSync(statePath) || !existsSync(rendererPath) || !existsSync(widgetPath)) {
+    const faviconPath = join(import.meta.dir, "favicon.svg")
+    if (
+      !existsSync(statePath) || !existsSync(rendererPath) ||
+      !existsSync(widgetPath) || !existsSync(faviconPath)
+    ) {
       console.error(`Error: Widget source files not found in ${import.meta.dir}`)
       process.exit(1)
     }
@@ -150,6 +155,7 @@ export class WebConnector extends BaseConnector<WebSession> {
       ...[statePath, rendererPath, widgetPath]
         .map((filePath) => readFileSync(filePath, "utf-8")),
     ].join("\n")
+    this.faviconSource = readFileSync(faviconPath, "utf-8")
 
     const connector = this
     this.server = Bun.serve<WSData>({
@@ -234,6 +240,17 @@ export class WebConnector extends BaseConnector<WebSession> {
       const ok = server.upgrade(req, { data: { clientId } })
       if (ok) return undefined
       return new Response("WebSocket upgrade failed", { status: 400 })
+    }
+
+    // Favicon
+    if (url.pathname === "/favicon.svg") {
+      return new Response(this.faviconSource, {
+        headers: {
+          "Content-Type": "image/svg+xml; charset=utf-8",
+          "Cache-Control": "public, max-age=86400",
+          ...cors,
+        },
+      })
     }
 
     // Widget JS
@@ -783,7 +800,7 @@ export class WebConnector extends BaseConnector<WebSession> {
 <html lang="en"><head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <link rel="icon" href="data:,">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <title>${title} Chat</title>
   <style>
     * { box-sizing: border-box; }

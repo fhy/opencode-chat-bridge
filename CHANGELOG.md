@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   resumed by the next Web request. Session workspaces and uploads are preserved.
 - **Web UI bot name** - Standalone and test-page browser titles and widget
   headings now use the configured global `botName` instead of `OpenCode`.
+- **Web robot favicon** - The standalone chat now uses a bundled robot SVG at
+  `/favicon.svg` instead of explicitly disabling the browser favicon.
 
 ## [0.6.0] - 2026-07-26
 
