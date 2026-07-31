@@ -138,6 +138,7 @@ describe("Web empty ACP responses", () => {
     expect(fake.retryCount()).toBe(1)
     expect(fake.invalidationCount()).toBe(1)
     expect(fake.messages).toEqual([
+      { type: "session_state", state: "stale-invalidated" },
       {
         type: "error",
         message: "The AI service completed without returning a usable response. Please try again.",
@@ -188,6 +189,7 @@ describe("Web empty ACP responses", () => {
     expect(fake.retryCount()).toBe(1)
     expect(fake.invalidationCount()).toBe(1)
     expect(fake.messages).toEqual([
+      { type: "session_state", state: "stale-invalidated" },
       {
         type: "error",
         message: "The AI service completed without returning a usable response. Please try again.",

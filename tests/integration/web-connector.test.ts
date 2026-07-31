@@ -6,7 +6,7 @@
  */
 
 import { describe, test, expect, beforeAll, afterAll } from "bun:test"
-import { mkdtempSync, rmSync, writeFileSync } from "fs"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs"
 import { tmpdir } from "os"
 import { join } from "path"
 
@@ -195,6 +195,7 @@ describe("web connector WebSocket", () => {
     expect(msg.type).toBe("connected")
     expect(msg.clientId).toBe("test-1")
     expect(msg.hasSession).toBe(false)
+    expect(msg.state).toBe("new")
     ws.close()
   })
 
@@ -211,6 +212,63 @@ describe("web connector WebSocket", () => {
     expect(msg.clientId).toBeTruthy()
     expect(msg.clientId.length).toBeGreaterThan(0)
     expect(msg.hasSession).toBe(false)
+    expect(msg.state).toBe("new")
+    ws.close()
+  })
+
+  test("reports a persisted session as resumed after in-memory state is lost", async () => {
+    const clientId = "test-persisted"
+    const storePath = join(serverCwd!, ".opencode", "chat-sessions.json")
+    mkdirSync(join(serverCwd!, ".opencode"), { recursive: true })
+    writeFileSync(storePath, JSON.stringify({
+      version: 1,
+      sessions: [{
+        connector: "web",
+        threadId: clientId,
+        sessionId: "persisted-acp-session",
+        cwd: join(serverCwd!, "session-cwd"),
+        backendId: "test-backend",
+        updatedAt: new Date().toISOString(),
+      }],
+    }))
+
+    const ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws?clientId=${clientId}`)
+    const msg = await new Promise<any>((resolve, reject) => {
+      ws.onmessage = (event) => resolve(JSON.parse(event.data))
+      ws.onerror = reject
+      setTimeout(() => reject(new Error("timeout")), 5000)
+    })
+
+    expect(msg.type).toBe("connected")
+    expect(msg.hasSession).toBe(true)
+    expect(msg.state).toBe("resumed")
+    ws.close()
+  })
+
+  test("confirms explicit clear commands with a cleared session state", async () => {
+    const clientId = "test-clear-state"
+    const ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws?clientId=${clientId}`)
+    await new Promise<void>((resolve, reject) => {
+      ws.onmessage = () => resolve()
+      ws.onerror = reject
+    })
+
+    const events: any[] = []
+    const cleared = new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error("clear confirmation timeout")), 5000)
+      ws.onmessage = (event) => {
+        const message = JSON.parse(event.data)
+        events.push(message)
+        if (message.type === "session_state" && message.state === "cleared") {
+          clearTimeout(timeout)
+          resolve()
+        }
+      }
+    })
+    ws.send(JSON.stringify({ type: "message", text: "/clear" }))
+    await cleared
+
+    expect(events.some((event) => event.type === "response")).toBe(true)
     ws.close()
   })
 

@@ -204,16 +204,19 @@ For documents use [DOCLIBRARY_DOC]/full/path/to/file.pdf[/DOCLIBRARY_DOC].
 
 ### Session Management
 
-- Sessions persist while the server runs (in-memory)
-- Widget stores chat history in localStorage (last 50 messages)
-- History clears automatically when connecting to a fresh server session
+- ACP mappings are persisted by connector and browser `clientId` in
+  `sessionStorePath`, including the backend session ID and canonical workspace.
+- After a bridge restart, reconnecting with the same browser `clientId` reports
+  the conversation as resumed and restores the ACP session on the next request.
 - Commands: `/help`, `/status`, `/clear`
 
 ### Chat History
 
-- Stored in the browser's localStorage
-- Cleared automatically when the server session is gone (e.g., server restart)
-- Clear manually via the trash icon in the header or the `/clear` command
+- The widget stores the last 50 visible messages in browser localStorage.
+- Bridge restarts, reconnects, session invalidation, and backend errors preserve
+  local history.
+- History clears only through the trash button or a confirmed `/clear` or
+  `/reset` command.
 
 ## Test Pages
 

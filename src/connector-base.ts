@@ -907,6 +907,15 @@ export abstract class BaseConnector<TSession extends BaseSession> {
   }
 
   /**
+   * Check whether this connector/thread has a persisted ACP session mapping.
+   * This allows connectors to recognize sessions before recreating their
+   * in-memory ACP client after a process restart.
+   */
+  protected hasPersistedACPSession(id: string): boolean {
+    return this.acpSessionStore.get(this.config.connector, id) !== null
+  }
+
+  /**
    * Discard the current ACP client and persisted backend session mapping.
    * The workspace is deliberately preserved because it may contain uploads
    * and user-owned files.

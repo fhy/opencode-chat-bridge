@@ -647,17 +647,17 @@
 
       case "connected":
         clientId = d.clientId
-        // Clear only confirmed stale history. Preserve a request queued or in flight.
-        if (WidgetState.shouldClearHistory({
-          hasSession: d.hasSession,
-          messageCount: messages.length,
-          isProcessing: isProcessing,
-          hasPendingMessage: Boolean(pendingMessage),
-        })) {
+        // Connection state is informational. A bridge restart or unavailable
+        // backend must never erase browser-local conversation history.
+        saveState()
+        break
+
+      case "session_state":
+        if (WidgetState.shouldClearHistory(d)) {
           messages = []
+          saveState()
           renderHistory()
         }
-        saveState()
         break
 
       case "chunk":

@@ -318,9 +318,23 @@ export class WebConnector extends BaseConnector<WebSession> {
   private onWsOpen(ws: ServerWebSocket<WSData>): void {
     const { clientId } = ws.data
     this.wsClients.set(clientId, ws)
-    const hasSession = this.sessionManager.has(clientId)
-    this.log(`[WS] Connected: ${clientId.slice(0, 12)}... (${hasSession ? "resumed" : "new"})`)
-    this.wsSend(clientId, { type: "connected", clientId, hasSession })
+
+    let state: "resumed" | "new" | "backend-unavailable" = "new"
+    try {
+      if (
+        this.sessionManager.has(clientId) ||
+        this.hasPersistedACPSession(clientId)
+      ) {
+        state = "resumed"
+      }
+    } catch (err) {
+      state = "backend-unavailable"
+      this.logError(`[WS] Failed to inspect persisted session ${clientId}:`, err)
+    }
+
+    const hasSession = state === "resumed"
+    this.log(`[WS] Connected: ${clientId.slice(0, 12)}... (${state})`)
+    this.wsSend(clientId, { type: "connected", clientId, hasSession, state })
   }
 
   private async onWsMessage(
@@ -358,6 +372,7 @@ export class WebConnector extends BaseConnector<WebSession> {
     if (text.startsWith("/")) {
       const session = this.sessionManager.get(clientId)
       const cmds = session?.client.availableCommands || []
+      const normalizedCommand = text.toLowerCase()
       await this.handleCommand(
         clientId,
         text,
@@ -367,6 +382,9 @@ export class WebConnector extends BaseConnector<WebSession> {
           forwardToOpenCode: async (cmd) => this.processQuery(clientId, cmd),
         },
       )
+      if (normalizedCommand === "/clear" || normalizedCommand === "/reset") {
+        this.wsSend(clientId, { type: "session_state", state: "cleared" })
+      }
       return
     }
 
@@ -656,6 +674,7 @@ export class WebConnector extends BaseConnector<WebSession> {
           `[ACP] Invalidating failed retry session=${failedSession} reason=no-useful-output [${clientId}]`,
         )
         await this.invalidateACPSession(clientId)
+        this.wsSend(clientId, { type: "session_state", state: "stale-invalidated" })
         activeClient = null
       }
 

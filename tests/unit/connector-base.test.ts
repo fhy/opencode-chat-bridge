@@ -457,7 +457,20 @@ describe("BaseConnector active query handles", () => {
   })
 })
 
-describe("BaseConnector ACP session invalidation", () => {
+describe("BaseConnector ACP session persistence", () => {
+  test("detects a persisted connector and thread mapping without an in-memory session", () => {
+    const connector = new TestConnector() as any
+    connector.acpSessionStore = {
+      get: (connectorName: string, threadId: string) =>
+        connectorName === "test" && threadId === "thread-1"
+          ? { connector: connectorName, threadId }
+          : null,
+    }
+
+    expect(connector.hasPersistedACPSession("thread-1")).toBe(true)
+    expect(connector.hasPersistedACPSession("thread-2")).toBe(false)
+  })
+
   test("removes the persisted mapping and in-memory session without deleting the workspace", async () => {
     const connector = new TestConnector() as any
     const calls: string[] = []

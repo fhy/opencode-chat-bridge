@@ -4,11 +4,10 @@
 ;(function (global) {
   "use strict"
 
-  function shouldClearHistory(state) {
-    return !state.hasSession &&
-      state.messageCount > 0 &&
-      !state.isProcessing &&
-      !state.hasPendingMessage
+  function shouldClearHistory(event) {
+    return Boolean(event) &&
+      event.type === "session_state" &&
+      event.state === "cleared"
   }
 
   function positiveTimeout(value, fallback) {

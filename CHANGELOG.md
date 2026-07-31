@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   headings now use the configured global `botName` instead of `OpenCode`.
 - **Web robot favicon** - The standalone chat now uses a bundled robot SVG at
   `/favicon.svg` instead of explicitly disabling the browser favicon.
+- **Web restart continuity** - Reconnecting browsers recognize persisted ACP
+  mappings after bridge restarts, and local chat history is retained through
+  reconnects, invalidations, and backend errors until an explicit clear.
 
 ## [0.6.0] - 2026-07-26
 

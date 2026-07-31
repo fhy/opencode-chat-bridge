@@ -2,12 +2,11 @@ import { describe, expect, test } from "bun:test"
 import "../../connectors/web-widget-state.js"
 
 type WidgetStateHelpers = {
-  shouldClearHistory(state: {
-    hasSession: boolean
-    messageCount: number
-    isProcessing: boolean
-    hasPendingMessage: boolean
-  }): boolean
+  shouldClearHistory(event: {
+    type?: string
+    state?: string
+    hasSession?: boolean
+  } | null): boolean
   positiveTimeout(value: unknown, fallback: number): number
 }
 
@@ -16,49 +15,46 @@ const helpers = (globalThis as typeof globalThis & {
 }).OpenCodeWidgetState
 
 describe("Web widget connection state", () => {
-  test("clears stale history when the server confirms no session", () => {
+  test("preserves history for a new connection after a bridge restart", () => {
     expect(helpers.shouldClearHistory({
+      type: "connected",
+      state: "new",
       hasSession: false,
-      messageCount: 2,
-      isProcessing: false,
-      hasPendingMessage: false,
+    })).toBe(false)
+  })
+
+  test("preserves history when a persisted session resumes", () => {
+    expect(helpers.shouldClearHistory({
+      type: "connected",
+      state: "resumed",
+      hasSession: true,
+    })).toBe(false)
+  })
+
+  test("preserves history when the backend is unavailable", () => {
+    expect(helpers.shouldClearHistory({
+      type: "connected",
+      state: "backend-unavailable",
+      hasSession: false,
+    })).toBe(false)
+  })
+
+  test("preserves history when a backend session is invalidated", () => {
+    expect(helpers.shouldClearHistory({
+      type: "session_state",
+      state: "stale-invalidated",
+    })).toBe(false)
+  })
+
+  test("clears history only after an explicit clear confirmation", () => {
+    expect(helpers.shouldClearHistory({
+      type: "session_state",
+      state: "cleared",
     })).toBe(true)
   })
 
-  test("preserves history while a request is processing", () => {
-    expect(helpers.shouldClearHistory({
-      hasSession: false,
-      messageCount: 1,
-      isProcessing: true,
-      hasPendingMessage: false,
-    })).toBe(false)
-  })
-
-  test("preserves history while a message is queued", () => {
-    expect(helpers.shouldClearHistory({
-      hasSession: false,
-      messageCount: 1,
-      isProcessing: false,
-      hasPendingMessage: true,
-    })).toBe(false)
-  })
-
-  test("preserves history when the server has a session", () => {
-    expect(helpers.shouldClearHistory({
-      hasSession: true,
-      messageCount: 2,
-      isProcessing: false,
-      hasPendingMessage: false,
-    })).toBe(false)
-  })
-
-  test("does nothing when history is already empty", () => {
-    expect(helpers.shouldClearHistory({
-      hasSession: false,
-      messageCount: 0,
-      isProcessing: false,
-      hasPendingMessage: false,
-    })).toBe(false)
+  test("ignores missing events", () => {
+    expect(helpers.shouldClearHistory(null)).toBe(false)
   })
 
   test("accepts only finite positive timeout overrides", () => {
