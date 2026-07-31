@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in-flight user messages. Connection and processing watchdogs recover stuck
   status and disabled-send states, and stale sockets cannot unregister their
   replacement connection.
+- **Failed ACP retry persistence** - A replacement ACP session that also fails
+  without producing output or tool activity is invalidated instead of being
+  resumed by the next Web request. Session workspaces and uploads are preserved.
 
 ## [0.6.0] - 2026-07-26
 

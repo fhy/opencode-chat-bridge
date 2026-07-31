@@ -457,6 +457,33 @@ describe("BaseConnector active query handles", () => {
   })
 })
 
+describe("BaseConnector ACP session invalidation", () => {
+  test("removes the persisted mapping and in-memory session without deleting the workspace", async () => {
+    const connector = new TestConnector() as any
+    const calls: string[] = []
+    connector.acpSessionStore = {
+      delete: async (connectorName: string, threadId: string) => {
+        calls.push(`delete:${connectorName}:${threadId}`)
+      },
+    }
+    connector.sessionManager.set("thread-1", {
+      client: {
+        disconnect: async () => { calls.push("disconnect") },
+      },
+      createdAt: new Date(),
+      lastActivity: new Date(),
+      messageCount: 0,
+      inputChars: 0,
+      outputChars: 0,
+    })
+
+    await connector.invalidateACPSession("thread-1")
+
+    expect(calls).toEqual(["disconnect", "delete:test:thread-1"])
+    expect(connector.sessionManager.has("thread-1")).toBe(false)
+  })
+})
+
 // =============================================================================
 // SessionManager
 // =============================================================================

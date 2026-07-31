@@ -516,6 +516,14 @@ export class WebConnector extends BaseConnector<WebSession> {
     const cleanAttempt = (attempt: Awaited<ReturnType<typeof runAttempt>>) =>
       sanitizeServerPaths(removeDocMarkers(removeImageMarkers(attempt.buf)))
 
+    const sessionLabel = (session: WebSession) =>
+      session.client.currentSessionId?.slice(0, 8) || "unknown"
+
+    const hasNoUsefulOutput = (attempt: Awaited<ReturnType<typeof runAttempt>>) =>
+      !attempt.hadToolActivity && attempt.images === 0 && attempt.chunks === 0 &&
+      attempt.buf.length === 0 && attempt.acpResponse.length === 0 &&
+      attempt.toolResultsBuf.length === 0
+
     const logAttemptFailure = (
       attemptNumber: number,
       attempt: Awaited<ReturnType<typeof runAttempt>>,
@@ -563,6 +571,7 @@ export class WebConnector extends BaseConnector<WebSession> {
         if (!diagnostic) this.wsSend(clientId, { type: "chunk", text: attempt.acpResponse })
       }
 
+      let retried = false
       let failed = Boolean(attempt.error) || Boolean(diagnostic && attempt.images === 0)
       if (failed) {
         logAttemptFailure(1, attempt, diagnostic)
@@ -570,10 +579,17 @@ export class WebConnector extends BaseConnector<WebSession> {
           attempt.buf.length === 0
 
         if (safeToRetry) {
-          this.log(`[ACP] Retrying once with a fresh client/session [${clientId}]`)
+          const previousSession = sessionLabel(session)
+          this.log(
+            `[ACP] Retrying once with a fresh client/session oldSession=${previousSession} [${clientId}]`,
+          )
           const retrySession = await this.recreateACPSession(clientId, createSession)
+          retried = true
           if (!retrySession) throw new Error("Failed to create a fresh ACP session for retry")
           session = retrySession
+          this.log(
+            `[ACP] Retry session created newSession=${sessionLabel(session)} [${clientId}]`,
+          )
           session.messageCount++
           session.lastActivity = new Date()
           session.inputChars += query.length
@@ -598,6 +614,15 @@ export class WebConnector extends BaseConnector<WebSession> {
           failed = Boolean(attempt.error) || Boolean(diagnostic && attempt.images === 0)
           if (failed) logAttemptFailure(2, attempt, diagnostic)
         }
+      }
+
+      if (failed && retried && hasNoUsefulOutput(attempt)) {
+        const failedSession = sessionLabel(session)
+        this.log(
+          `[ACP] Invalidating failed retry session=${failedSession} reason=no-useful-output [${clientId}]`,
+        )
+        await this.invalidateACPSession(clientId)
+        activeClient = null
       }
 
       if (failed) {

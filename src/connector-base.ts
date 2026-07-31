@@ -907,6 +907,24 @@ export abstract class BaseConnector<TSession extends BaseSession> {
   }
 
   /**
+   * Discard the current ACP client and persisted backend session mapping.
+   * The workspace is deliberately preserved because it may contain uploads
+   * and user-owned files.
+   */
+  protected async invalidateACPSession(id: string): Promise<void> {
+    const existing = this.sessionManager.get(id)
+    this.sessionManager.delete(id)
+    if (existing) {
+      try {
+        await existing.client.disconnect()
+      } catch (err) {
+        this.logError(`Failed to disconnect invalidated ACP session ${id}:`, err)
+      }
+    }
+    await this.acpSessionStore.delete(this.config.connector, id)
+  }
+
+  /**
    * Discard the current ACP client and persisted backend session mapping, then
    * create a new ACP process and session for the same connector thread.
    */
@@ -914,12 +932,7 @@ export abstract class BaseConnector<TSession extends BaseSession> {
     id: string,
     createSessionData: (client: ACPClient) => TSession,
   ): Promise<TSession | null> {
-    const existing = this.sessionManager.get(id)
-    if (existing) {
-      await existing.client.disconnect()
-      this.sessionManager.delete(id)
-    }
-    await this.acpSessionStore.delete(this.config.connector, id)
+    await this.invalidateACPSession(id)
     return this.getOrCreateSession(id, createSessionData)
   }
   

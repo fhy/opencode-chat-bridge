@@ -7,12 +7,13 @@ interface AttemptScenario {
   chunks?: string[]
   error?: Error
   toolResult?: string
+  image?: string
 }
 
 class FakeACPClient extends EventEmitter {
   cancelled = false
 
-  constructor(private scenario: AttemptScenario) {
+  constructor(private scenario: AttemptScenario, public currentSessionId: string) {
     super()
   }
 
@@ -23,6 +24,9 @@ class FakeACPClient extends EventEmitter {
         toolName: "database",
         toolResult: this.scenario.toolResult,
       })
+    }
+    if (this.scenario.image) {
+      this.emit("image", { data: this.scenario.image, mimeType: "image/png" })
     }
     for (const chunk of this.scenario.chunks || []) this.emit("chunk", chunk)
     if (this.scenario.error) throw this.scenario.error
@@ -46,10 +50,11 @@ function webSession(client: FakeACPClient) {
 }
 
 function fakeConnector(firstScenario: AttemptScenario, retryScenario: AttemptScenario) {
-  const first = webSession(new FakeACPClient(firstScenario))
-  const retry = webSession(new FakeACPClient(retryScenario))
+  const first = webSession(new FakeACPClient(firstScenario, "old-session-id"))
+  const retry = webSession(new FakeACPClient(retryScenario, "new-session-id"))
   let current = first
   let retries = 0
+  let invalidations = 0
   const messages: any[] = []
   const logs: string[] = []
 
@@ -64,6 +69,9 @@ function fakeConnector(firstScenario: AttemptScenario, retryScenario: AttemptSce
         current = retry
         return retry
       },
+      invalidateACPSession: async () => {
+        invalidations++
+      },
       createBaseSession: () => first,
       sessionManager: { get: () => current },
       wsSend: (_clientId: string, data: any) => messages.push(data),
@@ -75,6 +83,7 @@ function fakeConnector(firstScenario: AttemptScenario, retryScenario: AttemptSce
     messages,
     logs,
     retryCount: () => retries,
+    invalidationCount: () => invalidations,
   }
 }
 
@@ -92,6 +101,7 @@ describe("Web empty ACP responses", () => {
     await processQuery(fake)
 
     expect(fake.retryCount()).toBe(1)
+    expect(fake.invalidationCount()).toBe(0)
     expect(fake.messages).toEqual([
       { type: "chunk", text: "recovered" },
       { type: "done" },
@@ -109,6 +119,7 @@ describe("Web empty ACP responses", () => {
     await processQuery(fake)
 
     expect(fake.retryCount()).toBe(1)
+    expect(fake.invalidationCount()).toBe(0)
     expect(fake.messages).toEqual([
       { type: "chunk", text: "answer" },
       { type: "done" },
@@ -125,6 +136,7 @@ describe("Web empty ACP responses", () => {
     await processQuery(fake)
 
     expect(fake.retryCount()).toBe(1)
+    expect(fake.invalidationCount()).toBe(1)
     expect(fake.messages).toEqual([
       {
         type: "error",
@@ -132,7 +144,40 @@ describe("Web empty ACP responses", () => {
       },
       { type: "done" },
     ])
+    expect(fake.logs.some((line) => line.includes("oldSession=old-ses"))).toBe(true)
+    expect(fake.logs.some((line) => line.includes("newSession=new-sess"))).toBe(true)
+    expect(fake.logs.some((line) => line.includes("Invalidating failed retry"))).toBe(true)
     expect(fake.logs.some((line) => line.includes("[FAIL]") && line.includes("reason=acp-error"))).toBe(true)
+  })
+
+  test("keeps a failed retry session when it produced partial output", async () => {
+    const fake = fakeConnector(
+      { error: new Error("first failure") },
+      { chunks: ["partial"], error: new Error("second failure") },
+    )
+
+    await processQuery(fake)
+
+    expect(fake.retryCount()).toBe(1)
+    expect(fake.invalidationCount()).toBe(0)
+    expect(fake.messages[0]).toEqual({ type: "chunk", text: "partial" })
+    expect(fake.messages.at(-1)).toEqual({ type: "done" })
+  })
+
+  test("keeps failed retry sessions that produced tool or image activity", async () => {
+    const activeRetries: AttemptScenario[] = [
+      { toolResult: "database result", error: new Error("tool failure") },
+      { image: "data:image/png;base64,AA==", error: new Error("image failure") },
+    ]
+
+    for (const retryScenario of activeRetries) {
+      const fake = fakeConnector({ error: new Error("first failure") }, retryScenario)
+
+      await processQuery(fake)
+
+      expect(fake.retryCount()).toBe(1)
+      expect(fake.invalidationCount()).toBe(0)
+    }
   })
 
   test("shows a visible failure instead of a blank completion after two empty attempts", async () => {
@@ -141,6 +186,7 @@ describe("Web empty ACP responses", () => {
     await processQuery(fake)
 
     expect(fake.retryCount()).toBe(1)
+    expect(fake.invalidationCount()).toBe(1)
     expect(fake.messages).toEqual([
       {
         type: "error",
@@ -161,6 +207,7 @@ describe("Web empty ACP responses", () => {
     await processQuery(fake)
 
     expect(fake.retryCount()).toBe(0)
+    expect(fake.invalidationCount()).toBe(0)
     expect(fake.messages.at(-2)).toEqual({
       type: "error",
       message: "The AI service completed without returning a usable response. Please try again.",
