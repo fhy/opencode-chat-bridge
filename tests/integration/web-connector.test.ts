@@ -6,21 +6,33 @@
  */
 
 import { describe, test, expect, beforeAll, afterAll } from "bun:test"
+import { mkdtempSync, rmSync, writeFileSync } from "fs"
+import { tmpdir } from "os"
+import { join } from "path"
 
 // ---------------------------------------------------------------------------
 // Helpers -- start/stop a real web connector on a random port
 // ---------------------------------------------------------------------------
 
 let serverProc: ReturnType<typeof Bun.spawn> | null = null
+let serverCwd: string | null = null
 let PORT: number
 let BASE: string
+const TEST_BOT_NAME = "Web Test Bot"
+const CONNECTOR_PATH = join(import.meta.dir, "../../connectors/web.ts")
 
 /** Pick a free port, start the connector, wait until ready. */
 async function startServer(env: Record<string, string> = {}) {
   PORT = 10000 + Math.floor(Math.random() * 50000)
   BASE = `http://127.0.0.1:${PORT}`
+  serverCwd = mkdtempSync(join(tmpdir(), "web-connector-test-"))
+  writeFileSync(
+    join(serverCwd, "chat-bridge.json"),
+    JSON.stringify({ botName: TEST_BOT_NAME }),
+  )
 
-  serverProc = Bun.spawn(["bun", "connectors/web.ts"], {
+  serverProc = Bun.spawn(["bun", CONNECTOR_PATH], {
+    cwd: serverCwd,
     env: {
       ...process.env,
       WEB_PORT: String(PORT),
@@ -46,6 +58,10 @@ function stopServer() {
   if (serverProc) {
     serverProc.kill()
     serverProc = null
+  }
+  if (serverCwd) {
+    rmSync(serverCwd, { recursive: true, force: true })
+    serverCwd = null
   }
 }
 
@@ -84,6 +100,8 @@ describe("web connector HTTP", () => {
 
     const js = await res.text()
     expect(js).toContain("OpenCode Chat Bridge")
+    expect(js).toContain(`window.OpenCodeWidgetServerConfig = {"title":"${TEST_BOT_NAME}"}`)
+    expect(js).toContain("UC.title || SERVER_CFG.title")
     expect(js).toContain("OpenCodeWidgetState")
     expect(js).toContain("OpenCodeMessageRenderer")
     expect(js.indexOf("OpenCodeWidgetState")).toBeLessThan(js.indexOf("__ocWidgetLoaded"))
@@ -109,6 +127,7 @@ describe("web connector HTTP", () => {
     expect(res.headers.get("content-type")).toContain("text/html")
 
     const html = await res.text()
+    expect(html).toContain(`<title>${TEST_BOT_NAME} Chat</title>`)
     expect(html).toContain('id="chat"')
     expect(html).toContain('mode: "embedded"')
     expect(html).toContain('container: "#chat"')
@@ -120,7 +139,8 @@ describe("web connector HTTP", () => {
     const res = await fetch(`${BASE}/test`)
     expect(res.status).toBe(200)
     const html = await res.text()
-    expect(html).toContain("Widget")
+    expect(html).toContain(`<title>${TEST_BOT_NAME} Chat - Widget</title>`)
+    expect(html).toContain(`<h1>${TEST_BOT_NAME} Chat Bridge - Web Widget</h1>`)
     expect(html).toContain("/widget.js")
   })
 
@@ -128,7 +148,8 @@ describe("web connector HTTP", () => {
     const res = await fetch(`${BASE}/test-embedded`)
     expect(res.status).toBe(200)
     const html = await res.text()
-    expect(html).toContain("Embedded")
+    expect(html).toContain(`<title>${TEST_BOT_NAME} Chat - Embedded</title>`)
+    expect(html).toContain(`<h1>${TEST_BOT_NAME} Chat - Embedded Mode</h1>`)
     expect(html).toContain("/widget.js")
   })
 

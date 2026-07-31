@@ -12,7 +12,7 @@
  *   window.OpenCodeWidget = {
  *     mode: "widget",            // "widget" | "embedded"
  *     container: "#chat",        // CSS selector (embedded mode)
- *     title: "OpenCode",
+ *     title: "OpenCode",         // defaults to the server botName
  *     placeholder: "Type a message...",
  *     welcome: "Hello! How can I help?",
  *     position: "right",         // bubble side: "right" | "left"
@@ -36,6 +36,7 @@
   // ==========================================================================
 
   var UC = window.OpenCodeWidget || {}
+  var SERVER_CFG = window.OpenCodeWidgetServerConfig || {}
 
   // Auto-detect server from script src
   var scriptEl = document.currentScript || document.querySelector('script[src*="widget.js"]')
@@ -53,7 +54,7 @@
   var PROCESSING_TIMEOUT_MS = WidgetState.positiveTimeout(UC.processingTimeoutMs, 330000)
 
   var CFG = {
-    title: UC.title || "OpenCode",
+    title: UC.title || SERVER_CFG.title || "OpenCode",
     placeholder: UC.placeholder || "Type a message...",
     welcome: UC.welcome || null,
     position: UC.position || "right",

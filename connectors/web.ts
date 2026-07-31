@@ -59,11 +59,25 @@ const ALLOWED_ORIGINS = process.env.WEB_ALLOWED_ORIGINS
   ? process.env.WEB_ALLOWED_ORIGINS.split(",").map((s) => s.trim())
   : (webCfg.allowedOrigins || ["*"])
 const TRIGGER = process.env.WEB_TRIGGER || config.trigger
+const BOT_NAME = config.botName || "OpenCode"
 const SESSION_RETENTION_DAYS = parseInt(
   process.env.SESSION_RETENTION_DAYS || "7",
   10,
 )
 const RATE_LIMIT_SECONDS = 2
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;")
+}
+
+function inlineJson(value: unknown): string {
+  return JSON.stringify(value).replaceAll("<", "\\u003c")
+}
 
 /**
  * Detect a reachable LAN IP so logs/snippets show something
@@ -108,7 +122,7 @@ export class WebConnector extends BaseConnector<WebSession> {
     super({
       connector: "web",
       trigger: TRIGGER,
-      botName: config.botName || "OpenCode",
+      botName: BOT_NAME,
       rateLimitSeconds: RATE_LIMIT_SECONDS,
       sessionRetentionDays: SESSION_RETENTION_DAYS,
     })
@@ -130,9 +144,12 @@ export class WebConnector extends BaseConnector<WebSession> {
       console.error(`Error: Widget source files not found in ${import.meta.dir}`)
       process.exit(1)
     }
-    this.widgetSource = [statePath, rendererPath, widgetPath]
-      .map((filePath) => readFileSync(filePath, "utf-8"))
-      .join("\n")
+    const serverWidgetConfig = `window.OpenCodeWidgetServerConfig = ${inlineJson({ title: BOT_NAME })};`
+    this.widgetSource = [
+      serverWidgetConfig,
+      ...[statePath, rendererPath, widgetPath]
+        .map((filePath) => readFileSync(filePath, "utf-8")),
+    ].join("\n")
 
     const connector = this
     this.server = Bun.serve<WSData>({
@@ -761,12 +778,13 @@ export class WebConnector extends BaseConnector<WebSession> {
   }
 
   private fullPage(): string {
+    const title = escapeHtml(BOT_NAME)
     return `<!DOCTYPE html>
 <html lang="en"><head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <link rel="icon" href="data:,">
-  <title>OpenCode Chat</title>
+  <title>${title} Chat</title>
   <style>
     * { box-sizing: border-box; }
     html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
@@ -783,13 +801,14 @@ export class WebConnector extends BaseConnector<WebSession> {
     // Actual widget loads via relative path (works from any IP).
     // Example snippets use the public URL so users can copy-paste.
     const pub = WEB_PUBLIC_URL
+    const title = escapeHtml(BOT_NAME)
 
     if (mode === "embedded") {
       return `<!DOCTYPE html>
 <html><head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>OpenCode Chat - Embedded</title>
+  <title>${title} Chat - Embedded</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: system-ui, sans-serif; background: #f1f5f9; display: flex; flex-direction: column; height: 100vh; }
@@ -800,7 +819,7 @@ export class WebConnector extends BaseConnector<WebSession> {
   </style>
 </head><body>
   <header>
-    <h1>OpenCode Chat - Embedded Mode</h1>
+    <h1>${title} Chat - Embedded Mode</h1>
     <p>The chat fills the container below.
        <a href="/test">Switch to widget mode</a></p>
   </header>
@@ -814,7 +833,7 @@ export class WebConnector extends BaseConnector<WebSession> {
 <html><head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>OpenCode Chat - Widget</title>
+  <title>${title} Chat - Widget</title>
   <style>
     body { font-family: system-ui, sans-serif; max-width: 720px; margin: 60px auto; padding: 0 20px; color: #1e293b; }
     h1 { margin-bottom: 8px; }
@@ -823,7 +842,7 @@ export class WebConnector extends BaseConnector<WebSession> {
     a { color: #2563eb; }
   </style>
 </head><body>
-  <h1>OpenCode Chat Bridge - Web Widget</h1>
+  <h1>${title} Chat Bridge - Web Widget</h1>
   <p>The chat widget is in the bottom-right corner. Click the bubble to open it.</p>
   <p><a href="/test-embedded">Switch to embedded mode</a></p>
   <h2>Widget snippet</h2>

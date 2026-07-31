@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Failed ACP retry persistence** - A replacement ACP session that also fails
   without producing output or tool activity is invalidated instead of being
   resumed by the next Web request. Session workspaces and uploads are preserved.
+- **Web UI bot name** - Standalone and test-page browser titles and widget
+  headings now use the configured global `botName` instead of `OpenCode`.
 
 ## [0.6.0] - 2026-07-26
 
