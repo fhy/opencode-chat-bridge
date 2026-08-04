@@ -52,6 +52,7 @@
   var WidgetState = window.OpenCodeWidgetState
   var CONNECT_TIMEOUT_MS = WidgetState.positiveTimeout(UC.connectTimeoutMs, 10000)
   var PROCESSING_TIMEOUT_MS = WidgetState.positiveTimeout(UC.processingTimeoutMs, 330000)
+  var ATTACHMENTS = SERVER_CFG.attachments || { enabled: false }
 
   var CFG = {
     title: UC.title || SERVER_CFG.title || "OpenCode",
@@ -84,10 +85,14 @@
   var curBotEl = null // DOM element currently receiving streamed chunks
   var curBotText = "" // Raw streamed text; re-rendered after every chunk
   var curBotSupplementalText = "" // File labels previously included by textContent persistence
-  var pendingMessage = null // queued when sending while disconnected
+  var pendingMessage = null // queued payload when sending while disconnected
+  var selectedImages = [] // transient; image bytes are never persisted to localStorage
+  var addingImages = false
+  var imageSelectionGeneration = 0
 
   // DOM refs
   var root, bubble, panel, msgsEl, inputEl, sendBtn, statusEl, thinkingEl
+  var imageInputEl, imagePreviewEl, imageErrorEl
   var activityEls = Object.create(null)
 
   // ==========================================================================
@@ -196,7 +201,8 @@
       "@keyframes oc-dot{0%,80%,100%{transform:scale(0)}40%{transform:scale(1)}}",
 
       // --- Input area ---
-      ".oc-inp-area{padding:12px;border-top:1px solid #e2e8f0;display:flex;gap:8px;flex-shrink:0;background:#fff;}",
+      ".oc-inp-area{padding:12px;border-top:1px solid #e2e8f0;display:flex;flex-direction:column;gap:8px;flex-shrink:0;background:#fff;}",
+      ".oc-inp-row{display:flex;gap:8px;align-items:flex-end;}",
       ".oc-inp{flex:1;padding:10px 14px;border:1px solid #e2e8f0;border-radius:10px;font-size:14px;font-family:inherit;resize:none;" +
         "outline:none;max-height:100px;min-height:40px;line-height:1.4;transition:border-color .2s;}",
       ".oc-inp:focus{border-color:" + CFG.primary + ";}",
@@ -205,6 +211,15 @@
         "display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:opacity .2s;align-self:flex-end;}",
       ".oc-send:disabled{opacity:.4;cursor:not-allowed;}",
       ".oc-send svg{width:18px;height:18px;fill:currentColor;}",
+      ".oc-attach{width:40px;height:40px;border-radius:10px;background:#fff;color:#64748b;border:1px solid #e2e8f0;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}",
+      ".oc-attach:hover{color:" + CFG.primary + ";border-color:" + CFG.primary + ";}",
+      ".oc-attach svg{width:19px;height:19px;fill:currentColor;}",
+      ".oc-img-preview{display:flex;gap:8px;flex-wrap:wrap;}",
+      ".oc-img-item{position:relative;width:64px;height:64px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;background:#f8fafc;}",
+      ".oc-img-item img{width:100%;height:100%;object-fit:cover;display:block;}",
+      ".oc-img-remove{position:absolute;top:2px;right:2px;width:20px;height:20px;border:0;border-radius:50%;background:rgba(15,23,42,.8);color:#fff;cursor:pointer;font-size:15px;line-height:18px;}",
+      ".oc-img-error{font-size:12px;color:#b91c1c;display:none;}",
+      ".oc-img-error--on{display:block;}",
 
       // --- Welcome ---
       ".oc-welcome{text-align:center;color:#64748b;padding:20px;font-size:13px;}",
@@ -228,6 +243,7 @@
   var ICON_DOWN = '<svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>'
   var ICON_CLOSE = '<svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>'
   var ICON_SEND = '<svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>'
+  var ICON_ATTACH = '<svg viewBox="0 0 24 24"><path d="M16.5 6v11.5a4.5 4.5 0 0 1-9 0V5a3 3 0 0 1 6 0v10.5a1.5 1.5 0 0 1-3 0V6H9v9.5a3 3 0 0 0 6 0V5a4.5 4.5 0 0 0-9 0v12.5a6 6 0 0 0 12 0V6h-1.5z"/></svg>'
   var ICON_CLEAR = '<svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>'
 
   // ==========================================================================
@@ -289,20 +305,55 @@
     var inpArea = document.createElement("div")
     inpArea.className = "oc-inp-area"
 
+    imagePreviewEl = document.createElement("div")
+    imagePreviewEl.className = "oc-img-preview"
+    imageErrorEl = document.createElement("div")
+    imageErrorEl.className = "oc-img-error"
+
+    var inpRow = document.createElement("div")
+    inpRow.className = "oc-inp-row"
+
     inputEl = document.createElement("textarea")
     inputEl.className = "oc-inp"
     inputEl.placeholder = CFG.placeholder
     inputEl.rows = 1
+    inputEl.maxLength = 100000
     inputEl.onkeydown = onKey
     inputEl.oninput = autoGrow
+    inputEl.onpaste = onPaste
+
+    if (ATTACHMENTS.enabled) {
+      imageInputEl = document.createElement("input")
+      imageInputEl.type = "file"
+      imageInputEl.accept = (ATTACHMENTS.allowedMimeTypes || []).join(",")
+      imageInputEl.multiple = ATTACHMENTS.maxFilesPerMessage > 1
+      imageInputEl.hidden = true
+      imageInputEl.onchange = function () {
+        addImageFiles(Array.from(imageInputEl.files || []))
+        imageInputEl.value = ""
+      }
+
+      var attachBtn = document.createElement("button")
+      attachBtn.type = "button"
+      attachBtn.className = "oc-attach"
+      attachBtn.title = "Attach image"
+      attachBtn.setAttribute("aria-label", "Attach image")
+      attachBtn.innerHTML = ICON_ATTACH
+      attachBtn.onclick = function () { imageInputEl.click() }
+      inpRow.appendChild(attachBtn)
+      inpArea.appendChild(imageInputEl)
+    }
 
     sendBtn = document.createElement("button")
     sendBtn.className = "oc-send"
     sendBtn.innerHTML = ICON_SEND
     sendBtn.onclick = doSend
 
-    inpArea.appendChild(inputEl)
-    inpArea.appendChild(sendBtn)
+    inpRow.appendChild(inputEl)
+    inpRow.appendChild(sendBtn)
+    inpArea.appendChild(imagePreviewEl)
+    inpArea.appendChild(imageErrorEl)
+    inpArea.appendChild(inpRow)
 
     panel.appendChild(hdr)
     panel.appendChild(msgsEl)
@@ -423,6 +474,168 @@
     if (b) b.classList.remove("oc-badge--on")
   }
 
+  function showImageError(message) {
+    if (!imageErrorEl) return
+    imageErrorEl.textContent = message || ""
+    imageErrorEl.classList.toggle("oc-img-error--on", Boolean(message))
+  }
+
+  function onPaste(e) {
+    if (!ATTACHMENTS.enabled || !e.clipboardData) return
+    var files = []
+    var items = Array.from(e.clipboardData.items || [])
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].kind === "file" && items[i].type.indexOf("image/") === 0) {
+        var file = items[i].getAsFile()
+        if (file) files.push(file)
+      }
+    }
+    if (files.length === 0) return
+    e.preventDefault()
+    addImageFiles(files)
+  }
+
+  async function addImageFiles(files) {
+    if (addingImages) return
+    addingImages = true
+    var generation = imageSelectionGeneration
+    showImageError("")
+    try {
+      var remaining = ATTACHMENTS.maxFilesPerMessage - selectedImages.length
+      if (remaining <= 0) {
+        showImageError("Only " + ATTACHMENTS.maxFilesPerMessage + " image(s) may be attached.")
+        return
+      }
+      if (files.length > remaining) {
+        showImageError("Only " + ATTACHMENTS.maxFilesPerMessage + " image(s) may be attached.")
+      }
+      for (var i = 0; i < files.length && i < remaining; i++) {
+        try {
+          var prepared = await prepareImage(files[i])
+          if (generation !== imageSelectionGeneration) return
+          selectedImages.push(prepared)
+          renderSelectedImages()
+        } catch (e) {
+          showImageError(e && e.message ? e.message : "Could not attach that image.")
+          break
+        }
+      }
+    } finally {
+      addingImages = false
+    }
+  }
+
+  async function inspectImageDimensions(file) {
+    var bytes = new Uint8Array(await file.arrayBuffer())
+    return WidgetState.imageDimensions(bytes, file.type)
+  }
+
+  async function prepareImage(file) {
+    var allowed = ATTACHMENTS.allowedMimeTypes || []
+    if (allowed.indexOf(file.type) === -1) throw new Error("Unsupported image type.")
+    if (file.size > ATTACHMENTS.maxFileBytes) {
+      throw new Error("Image exceeds the " + Math.floor(ATTACHMENTS.maxFileBytes / 1048576) + " MiB limit.")
+    }
+
+    var dimensions = await inspectImageDimensions(file)
+    if (!dimensions) throw new Error("The pasted file is not a valid image.")
+    var width = dimensions.width
+    var height = dimensions.height
+    var pixels = width * height
+    if (width < 1 || height < 1 || width > ATTACHMENTS.maxWidth || height > ATTACHMENTS.maxHeight || pixels > ATTACHMENTS.maxPixels) {
+      throw new Error("Image dimensions are too large.")
+    }
+
+    var blob = file
+    var resizeMax = ATTACHMENTS.resizeMaxDimension
+    if (Math.max(width, height) > resizeMax) {
+      var bitmap
+      try {
+        bitmap = await createImageBitmap(file)
+      } catch (e) {
+        throw new Error("The pasted file is not a valid image.")
+      }
+      width = bitmap.width
+      height = bitmap.height
+      var scale = resizeMax / Math.max(width, height)
+      var targetWidth = Math.max(1, Math.round(width * scale))
+      var targetHeight = Math.max(1, Math.round(height * scale))
+      var canvas = document.createElement("canvas")
+      canvas.width = targetWidth
+      canvas.height = targetHeight
+      var context = canvas.getContext("2d")
+      if (!context) {
+        bitmap.close()
+        throw new Error("Image resizing is unavailable in this browser.")
+      }
+      context.drawImage(bitmap, 0, 0, targetWidth, targetHeight)
+      try {
+        blob = await new Promise(function (resolve, reject) {
+          canvas.toBlob(function (result) {
+            if (result) resolve(result)
+            else reject(new Error("Could not resize the image."))
+          }, file.type, 0.85)
+        })
+      } finally {
+        bitmap.close()
+      }
+      width = targetWidth
+      height = targetHeight
+    }
+
+    if (blob.size > ATTACHMENTS.maxFileBytes) {
+      throw new Error("Resized image still exceeds the upload limit.")
+    }
+    var data = await blobToBase64(blob)
+    return { mimeType: blob.type || file.type, data: data, width: width, height: height }
+  }
+
+  function blobToBase64(blob) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader()
+      reader.onload = function () {
+        var result = String(reader.result || "")
+        var comma = result.indexOf(",")
+        if (comma < 0) reject(new Error("Could not read the image."))
+        else resolve(result.slice(comma + 1))
+      }
+      reader.onerror = function () { reject(new Error("Could not read the image.")) }
+      reader.readAsDataURL(blob)
+    })
+  }
+
+  function renderSelectedImages() {
+    if (!imagePreviewEl) return
+    imagePreviewEl.textContent = ""
+    selectedImages.forEach(function (image, index) {
+      var item = document.createElement("div")
+      item.className = "oc-img-item"
+      var preview = document.createElement("img")
+      preview.src = "data:" + image.mimeType + ";base64," + image.data
+      preview.alt = "Attached image"
+      var remove = document.createElement("button")
+      remove.type = "button"
+      remove.className = "oc-img-remove"
+      remove.setAttribute("aria-label", "Remove image")
+      remove.textContent = "x"
+      remove.onclick = function () {
+        selectedImages.splice(index, 1)
+        showImageError("")
+        renderSelectedImages()
+      }
+      item.appendChild(preview)
+      item.appendChild(remove)
+      imagePreviewEl.appendChild(item)
+    })
+  }
+
+  function clearSelectedImages() {
+    imageSelectionGeneration++
+    selectedImages = []
+    showImageError("")
+    renderSelectedImages()
+  }
+
   function onKey(e) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
@@ -437,11 +650,40 @@
 
   function doSend() {
     var text = inputEl.value.trim()
-    if (!text || isProcessing) return
+    if (addingImages) {
+      showImageError("Wait for the image preview before sending.")
+      return
+    }
+    if ((!text && selectedImages.length === 0) || isProcessing) return
+    if (text.charAt(0) === "/" && selectedImages.length > 0) {
+      showImageError("Remove the image before sending a command.")
+      return
+    }
 
-    addMsg("user", text)
+    var outgoingImages = selectedImages.slice()
+    var displayText = text
+    if (outgoingImages.length > 0) {
+      displayText += (displayText ? "\n" : "") +
+        "[Attached " + outgoingImages.length + " image" + (outgoingImages.length === 1 ? "" : "s") + "]"
+    }
+    var userBubble = addMsg("user", displayText)
+    outgoingImages.forEach(function (image) {
+      var preview = document.createElement("img")
+      preview.src = "data:" + image.mimeType + ";base64," + image.data
+      preview.alt = "Attached image"
+      userBubble.appendChild(preview)
+    })
+
+    var payload = {
+      type: "message",
+      text: text,
+      images: outgoingImages.map(function (image) {
+        return { mimeType: image.mimeType, data: image.data }
+      }),
+    }
     inputEl.value = ""
     inputEl.style.height = "auto"
+    clearSelectedImages()
 
     showThinking()
     isProcessing = true
@@ -449,22 +691,24 @@
     armProcessingTimer()
 
     if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "message", text: text }))
+      ws.send(JSON.stringify(payload))
     } else {
-      // Queue message -- it will be sent automatically on reconnect
-      pendingMessage = text
+      // Queue one validated payload -- including transient image data -- until reconnect.
+      pendingMessage = payload
       ensureConnected()
     }
   }
 
   function addMsg(role, text) {
     messages.push({ role: role, text: text, ts: Date.now() })
-    appendBubble(role, text)
+    var bubbleElement = appendBubble(role, text)
     scrollDown()
     saveState()
+    return bubbleElement
   }
 
   function clearChat() {
+    clearSelectedImages()
     // Send /clear to server if connected
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: "message", text: "/clear" }))
@@ -603,7 +847,7 @@
 
       // Flush any message queued while disconnected
       if (pendingMessage) {
-        socket.send(JSON.stringify({ type: "message", text: pendingMessage }))
+        socket.send(JSON.stringify(pendingMessage))
         pendingMessage = null
         armProcessingTimer()
       }

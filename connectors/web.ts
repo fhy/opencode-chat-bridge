@@ -46,6 +46,7 @@ import {
   removeDocMarkers,
 } from "../src"
 import { diagnoseEmptyResponse } from "../src/acp-response-diagnostics"
+import { validateWebPromptImages, type WebPromptImage } from "../src/web-image-input"
 
 // =============================================================================
 // Configuration
@@ -60,11 +61,13 @@ const ALLOWED_ORIGINS = process.env.WEB_ALLOWED_ORIGINS
   : (webCfg.allowedOrigins || ["*"])
 const TRIGGER = process.env.WEB_TRIGGER || config.trigger
 const BOT_NAME = config.botName || "OpenCode"
+const WEB_ATTACHMENTS = config.web.attachments
 const SESSION_RETENTION_DAYS = parseInt(
   process.env.SESSION_RETENTION_DAYS || "7",
   10,
 )
 const RATE_LIMIT_SECONDS = 2
+const MAX_WEB_TEXT_CHARS = 100_000
 
 function escapeHtml(value: string): string {
   return value
@@ -149,7 +152,10 @@ export class WebConnector extends BaseConnector<WebSession> {
       console.error(`Error: Widget source files not found in ${import.meta.dir}`)
       process.exit(1)
     }
-    const serverWidgetConfig = `window.OpenCodeWidgetServerConfig = ${inlineJson({ title: BOT_NAME })};`
+    const serverWidgetConfig = `window.OpenCodeWidgetServerConfig = ${inlineJson({
+      title: BOT_NAME,
+      attachments: WEB_ATTACHMENTS,
+    })};`
     this.widgetSource = [
       serverWidgetConfig,
       ...[statePath, rendererPath, widgetPath]
@@ -167,6 +173,9 @@ export class WebConnector extends BaseConnector<WebSession> {
       },
 
       websocket: {
+        maxPayloadLength: WEB_ATTACHMENTS.enabled
+          ? Math.ceil(WEB_ATTACHMENTS.maxFileBytes * 4 / 3) * WEB_ATTACHMENTS.maxFilesPerMessage + 128 * 1024
+          : 1024 * 1024,
         open(ws) {
           connector.onWsOpen(ws)
         },
@@ -353,13 +362,14 @@ export class WebConnector extends BaseConnector<WebSession> {
 
     if (msg.type !== "message" || typeof msg.text !== "string") return
     const text = msg.text.trim()
-    if (!text) return
-
-    await this.stopMirrorForUserActivity(clientId, text, async (resp) => {
-      this.wsSend(clientId, { type: "response", text: resp })
-    })
-
-    // Rate limit
+    if (text.length > MAX_WEB_TEXT_CHARS) {
+      this.wsSend(clientId, { type: "error", message: "Message text is too long." })
+      return
+    }
+    if (!text && (msg.images === undefined || (Array.isArray(msg.images) && msg.images.length === 0))) {
+      return
+    }
+    // Apply per-client throttling before decoding potentially large base64 payloads.
     if (!this.checkRateLimit(clientId)) {
       this.wsSend(clientId, {
         type: "error",
@@ -367,9 +377,31 @@ export class WebConnector extends BaseConnector<WebSession> {
       })
       return
     }
+    let images: WebPromptImage[]
+    try {
+      images = validateWebPromptImages(msg.images, WEB_ATTACHMENTS)
+    } catch (err) {
+      this.wsSend(clientId, {
+        type: "error",
+        message: err instanceof Error ? err.message : "Invalid image attachment.",
+      })
+      return
+    }
+    if (!text && images.length === 0) return
+
+    await this.stopMirrorForUserActivity(clientId, text, async (resp) => {
+      this.wsSend(clientId, { type: "response", text: resp })
+    })
 
     // Commands
     if (text.startsWith("/")) {
+      if (images.length > 0) {
+        this.wsSend(clientId, {
+          type: "error",
+          message: "Image attachments cannot be sent with commands.",
+        })
+        return
+      }
       const session = this.sessionManager.get(clientId)
       const cmds = session?.client.availableCommands || []
       const normalizedCommand = text.toLowerCase()
@@ -388,7 +420,11 @@ export class WebConnector extends BaseConnector<WebSession> {
       return
     }
 
-    await this.processQuery(clientId, text)
+    await this.processQuery(
+      clientId,
+      text || "Please analyze the attached image.",
+      images,
+    )
   }
 
   private onWsClose(ws: ServerWebSocket<WSData>): void {
@@ -405,6 +441,7 @@ export class WebConnector extends BaseConnector<WebSession> {
   private async processQuery(
     clientId: string,
     query: string,
+    images: WebPromptImage[] = [],
   ): Promise<void> {
     const t0 = Date.now()
 
@@ -539,7 +576,10 @@ export class WebConnector extends BaseConnector<WebSession> {
       let acpResponse = ""
       let error: unknown = null
       try {
-        acpResponse = await Promise.race([client.prompt(query), timeoutPromise])
+        acpResponse = await Promise.race([
+          client.prompt(query, { images }),
+          timeoutPromise,
+        ])
       } catch (err) {
         error = err
       } finally {

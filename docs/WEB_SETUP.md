@@ -29,7 +29,17 @@ Settings go in `chat-bridge.json` under the `web` key. Environment variables ove
     "port": 3420,
     "host": "0.0.0.0",
     "allowedOrigins": ["*"],
-    "publicUrl": ""
+    "publicUrl": "",
+    "attachments": {
+      "enabled": false,
+      "maxFileBytes": 5242880,
+      "maxFilesPerMessage": 1,
+      "maxWidth": 4096,
+      "maxHeight": 4096,
+      "maxPixels": 20000000,
+      "resizeMaxDimension": 2048,
+      "allowedMimeTypes": ["image/jpeg", "image/png", "image/webp"]
+    }
   }
 }
 ```
@@ -40,6 +50,13 @@ Settings go in `chat-bridge.json` under the `web` key. Environment variables ove
 | `host` | Bind address | `0.0.0.0` (all interfaces) |
 | `allowedOrigins` | Origins allowed to connect. `["*"]` = any | `["*"]` |
 | `publicUrl` | URL shown in logs and embed snippets (for reverse proxy setups) | auto-detected |
+| `attachments.enabled` | Allow image selection and clipboard paste | `false` |
+| `attachments.maxFileBytes` | Maximum decoded bytes per image | `5242880` |
+| `attachments.maxFilesPerMessage` | Maximum images in one prompt | `1` |
+| `attachments.maxWidth` / `maxHeight` | Hard source-dimension limits | `4096` |
+| `attachments.maxPixels` | Hard decoded pixel limit | `20000000` |
+| `attachments.resizeMaxDimension` | Browser-side resize target | `2048` |
+| `attachments.allowedMimeTypes` | Accepted image formats | JPEG, PNG, WebP |
 
 ### Environment Variables
 
@@ -161,7 +178,18 @@ Set `publicUrl` so embed snippets show the correct URL:
 
 ## Images and Documents
 
-The AI can create files and display them inline in the chat.
+When `web.attachments.enabled` is true, users can select an image or paste one
+into the composer with Ctrl+V. The browser validates compressed size and decoded
+dimensions, resizes safe oversized images before sending, displays a removable
+preview, and requires an explicit Send action. Image bytes are not written to
+localStorage or the session workspace.
+
+The server independently verifies base64 size, MIME allowlisting, file magic,
+dimensions, and pixel count before forwarding native image content to ACP. SVG
+and other active formats are not accepted. Keep this feature disabled on public
+unauthenticated deployments; `allowedOrigins` is not authentication.
+
+The AI can also create files and display them inline in the chat.
 
 ### Images
 

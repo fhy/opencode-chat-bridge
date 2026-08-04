@@ -148,6 +148,28 @@ describe("ACPClient session updates", () => {
   })
 })
 
+describe("ACPClient multimodal prompts", () => {
+  test("sends text and images as native ACP prompt content", async () => {
+    const client = new ACPClient()
+    ;(client as any).sessionId = "session-1"
+    let prompt: any[] = []
+    ;(client as any).send = async (_method: string, params: any) => {
+      prompt = params.prompt
+      client.emit("update", { type: "text", content: "ok" })
+      return {}
+    }
+
+    await client.prompt("describe this", {
+      images: [{ mimeType: "image/png", data: "aW1hZ2U=" }],
+    })
+
+    expect(prompt).toEqual([
+      { type: "text", text: "describe this" },
+      { type: "image", mimeType: "image/png", data: "aW1hZ2U=" },
+    ])
+  })
+})
+
 describe("ACPClient prompt errors", () => {
   test("rejects JSON-RPC prompt errors", async () => {
     const client = new ACPClient()

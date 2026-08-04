@@ -48,6 +48,24 @@
     "token": "{env:DISCORD_TOKEN}"
   },
 
+  "web": {
+    "enabled": false,
+    "port": 3420,
+    "host": "0.0.0.0",
+    "allowedOrigins": ["*"],
+    "publicUrl": "",
+    "attachments": {
+      "enabled": false,
+      "maxFileBytes": 5242880,
+      "maxFilesPerMessage": 1,
+      "maxWidth": 4096,
+      "maxHeight": 4096,
+      "maxPixels": 20000000,
+      "resizeMaxDimension": 2048,
+      "allowedMimeTypes": ["image/jpeg", "image/png", "image/webp"]
+    }
+  },
+
   "telegram": {
     "enabled": false,
     "token": "{env:TELEGRAM_BOT_TOKEN}",

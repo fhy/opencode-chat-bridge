@@ -7,6 +7,7 @@ type WidgetStateHelpers = {
     state?: string
     hasSession?: boolean
   } | null): boolean
+  imageDimensions(bytes: Uint8Array, mimeType: string): { width: number; height: number } | null
   positiveTimeout(value: unknown, fallback: number): number
 }
 
@@ -55,6 +56,18 @@ describe("Web widget connection state", () => {
 
   test("ignores missing events", () => {
     expect(helpers.shouldClearHistory(null)).toBe(false)
+  })
+
+  test("reads image dimensions from safe headers before browser decoding", () => {
+    const png = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z1ZsAAAAASUVORK5CYII=",
+      "base64",
+    )
+    expect(helpers.imageDimensions(png, "image/png")).toEqual({ width: 1, height: 1 })
+
+    png.writeUInt32BE(50_000, 16)
+    expect(helpers.imageDimensions(png, "image/png")).toEqual({ width: 50_000, height: 1 })
+    expect(helpers.imageDimensions(png, "image/jpeg")).toBeNull()
   })
 
   test("accepts only finite positive timeout overrides", () => {

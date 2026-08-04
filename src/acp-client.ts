@@ -111,6 +111,11 @@ export interface ImageContent {
   alt?: string
 }
 
+export interface PromptImage {
+  mimeType: string
+  data: string
+}
+
 // OpenCode command definition
 export interface OpenCodeCommand {
   name: string
@@ -386,7 +391,10 @@ export class ACPClient extends EventEmitter {
     this.sessionId = null
   }
   
-  async prompt(text: string, options: { agent?: string } = {}): Promise<string> {
+  async prompt(
+    text: string,
+    options: { agent?: string; images?: PromptImage[] } = {},
+  ): Promise<string> {
     if (!this.sessionId) {
       await this.createSession()
     }
@@ -413,9 +421,13 @@ export class ACPClient extends EventEmitter {
     this.on("update", updateHandler)
     dbg(`PROMPT_HANDLER_REGISTERED`)
     
+    const prompt: any[] = [{ type: "text", text }]
+    for (const image of options.images || []) {
+      prompt.push({ type: "image", mimeType: image.mimeType, data: image.data })
+    }
     const params: any = {
       sessionId: this.sessionId,
-      prompt: [{ type: "text", text }],
+      prompt,
     }
     
     if (options.agent) {

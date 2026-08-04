@@ -100,8 +100,11 @@ describe("web connector HTTP", () => {
 
     const js = await res.text()
     expect(js).toContain("OpenCode Chat Bridge")
-    expect(js).toContain(`window.OpenCodeWidgetServerConfig = {"title":"${TEST_BOT_NAME}"}`)
+    expect(js).toContain(`window.OpenCodeWidgetServerConfig = {"title":"${TEST_BOT_NAME}","attachments":`)
+    expect(js).toContain('"enabled":false')
     expect(js).toContain("UC.title || SERVER_CFG.title")
+    expect(js).toContain("createImageBitmap(file)")
+    expect(js).toContain("inputEl.onpaste = onPaste")
     expect(js).toContain("OpenCodeWidgetState")
     expect(js).toContain("OpenCodeMessageRenderer")
     expect(js.indexOf("OpenCodeWidgetState")).toBeLessThan(js.indexOf("__ocWidgetLoaded"))
@@ -320,6 +323,32 @@ describe("web connector WebSocket", () => {
 
     expect(msg.type).toBe("error")
     expect(msg.message).toContain("Invalid JSON")
+    ws.close()
+  })
+
+  test("rejects image payloads when Web attachments are disabled", async () => {
+    const ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws?clientId=test-image-disabled`)
+    await new Promise<void>((resolve, reject) => {
+      ws.onmessage = () => resolve()
+      ws.onerror = reject
+    })
+
+    ws.send(JSON.stringify({
+      type: "message",
+      text: "describe this",
+      images: [{
+        mimeType: "image/png",
+        data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z1ZsAAAAASUVORK5CYII=",
+      }],
+    }))
+    const msg = await new Promise<any>((resolve, reject) => {
+      ws.onmessage = (event) => resolve(JSON.parse(event.data))
+      ws.onerror = reject
+      setTimeout(() => reject(new Error("timeout")), 5000)
+    })
+
+    expect(msg.type).toBe("error")
+    expect(msg.message).toContain("disabled")
     ws.close()
   })
 

@@ -150,6 +150,31 @@ describe("config", () => {
       expect(config.toolMessages.maxTraceEntries).toBe(20)
     })
 
+    test("merges and normalizes Web attachment limits", () => {
+      fs.writeFileSync(
+        path.join(testDir, "chat-bridge.json"),
+        JSON.stringify({
+          web: {
+            attachments: {
+              enabled: true,
+              maxFileBytes: 123456,
+              maxFilesPerMessage: 0,
+              allowedMimeTypes: ["image/png", "image/svg+xml"],
+            },
+          },
+        })
+      )
+      process.chdir(testDir)
+
+      const config = loadConfig()
+
+      expect(config.web.attachments.enabled).toBe(true)
+      expect(config.web.attachments.maxFileBytes).toBe(123456)
+      expect(config.web.attachments.maxFilesPerMessage).toBe(1)
+      expect(config.web.attachments.maxPixels).toBe(20_000_000)
+      expect(config.web.attachments.allowedMimeTypes).toEqual(["image/png"])
+    })
+
     test("loads from custom path", () => {
       const customPath = path.join(testDir, "custom-config.json")
       const configContent = { botName: "custom-path-bot" }

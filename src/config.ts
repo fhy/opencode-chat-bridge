@@ -88,12 +88,24 @@ export interface TelegramConfig {
 }
 
 
+export interface WebAttachmentsConfig {
+  enabled: boolean
+  maxFileBytes: number
+  maxFilesPerMessage: number
+  maxWidth: number
+  maxHeight: number
+  maxPixels: number
+  resizeMaxDimension: number
+  allowedMimeTypes: string[]
+}
+
 export interface WebConfig {
   enabled: boolean
   port: number
   host: string
   allowedOrigins: string[]  // CORS origins, ["*"] = any
   publicUrl: string         // Override for logs/snippets (e.g. behind reverse proxy)
+  attachments: WebAttachmentsConfig
 }
 
 export interface ACPConfig {
@@ -235,6 +247,16 @@ const defaultConfig: ChatBridgeConfig = {
     host: "0.0.0.0",
     allowedOrigins: ["*"],
     publicUrl: "",
+    attachments: {
+      enabled: false,
+      maxFileBytes: 5 * 1024 * 1024,
+      maxFilesPerMessage: 1,
+      maxWidth: 4096,
+      maxHeight: 4096,
+      maxPixels: 20_000_000,
+      resizeMaxDimension: 2048,
+      allowedMimeTypes: ["image/jpeg", "image/png", "image/webp"],
+    },
   }
 }
 
@@ -295,6 +317,51 @@ function normalizeToolMessages(config: ChatBridgeConfig): void {
   }
 }
 
+const WEB_IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"])
+
+function normalizeWebAttachments(config: ChatBridgeConfig): void {
+  const defaults = defaultConfig.web.attachments
+  if (
+    !config.web.attachments ||
+    typeof config.web.attachments !== "object" ||
+    Array.isArray(config.web.attachments)
+  ) {
+    config.web.attachments = { ...defaults, allowedMimeTypes: [...defaults.allowedMimeTypes] }
+  }
+  const attachments = config.web.attachments
+  if (typeof attachments.enabled !== "boolean") attachments.enabled = defaults.enabled
+  type PositiveIntegerKey =
+    | "maxFileBytes"
+    | "maxFilesPerMessage"
+    | "maxWidth"
+    | "maxHeight"
+    | "maxPixels"
+    | "resizeMaxDimension"
+  const positiveIntegerKeys: PositiveIntegerKey[] = [
+    "maxFileBytes",
+    "maxFilesPerMessage",
+    "maxWidth",
+    "maxHeight",
+    "maxPixels",
+    "resizeMaxDimension",
+  ]
+  for (const key of positiveIntegerKeys) {
+    const value = attachments[key]
+    if (!Number.isInteger(value) || value < 1) {
+      attachments[key] = defaults[key]
+    }
+  }
+  attachments.allowedMimeTypes = Array.isArray(attachments.allowedMimeTypes)
+    ? attachments.allowedMimeTypes.filter(
+      (mimeType): mimeType is string =>
+        typeof mimeType === "string" && WEB_IMAGE_MIME_TYPES.has(mimeType),
+    )
+    : [...defaults.allowedMimeTypes]
+  if (attachments.allowedMimeTypes.length === 0) {
+    attachments.allowedMimeTypes = [...defaults.allowedMimeTypes]
+  }
+}
+
 let cachedConfig: ChatBridgeConfig | null = null
 
 /**
@@ -327,6 +394,7 @@ export function loadConfig(configPath?: string): ChatBridgeConfig {
         const substituted = substituteEnvVars(parsed)
         cachedConfig = deepMerge(defaultConfig, substituted)
         normalizeToolMessages(cachedConfig)
+        normalizeWebAttachments(cachedConfig)
         console.log(`[CONFIG] Loaded from ${filePath}`)
         return cachedConfig
       } catch (err) {
@@ -338,6 +406,7 @@ export function loadConfig(configPath?: string): ChatBridgeConfig {
   console.log("[CONFIG] No config file found, using defaults")
   cachedConfig = deepMerge(defaultConfig, {})
   normalizeToolMessages(cachedConfig)
+  normalizeWebAttachments(cachedConfig)
   return cachedConfig
 }
 

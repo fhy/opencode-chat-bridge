@@ -25,6 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   mappings after bridge restarts, and local chat history is retained through
   reconnects, invalidations, and backend errors until an explicit clear.
 
+### Added
+- **Configurable Web image input** - Protected deployments can enable validated
+  JPEG, PNG, and WebP selection or clipboard paste. Images are previewed,
+  optionally resized in-browser, revalidated server-side, and sent as native
+  ACP prompt content without persisting image bytes in localStorage or workspaces.
+
 ## [0.6.0] - 2026-07-26
 
 ### Added
