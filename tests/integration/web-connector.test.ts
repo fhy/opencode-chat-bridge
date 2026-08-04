@@ -22,13 +22,16 @@ const TEST_BOT_NAME = "Web Test Bot"
 const CONNECTOR_PATH = join(import.meta.dir, "../../connectors/web.ts")
 
 /** Pick a free port, start the connector, wait until ready. */
-async function startServer(env: Record<string, string> = {}) {
+async function startServer(
+  env: Record<string, string> = {},
+  configure?: (cwd: string) => Record<string, unknown>,
+) {
   PORT = 10000 + Math.floor(Math.random() * 50000)
   BASE = `http://127.0.0.1:${PORT}`
   serverCwd = mkdtempSync(join(tmpdir(), "web-connector-test-"))
   writeFileSync(
     join(serverCwd, "chat-bridge.json"),
-    JSON.stringify({ botName: TEST_BOT_NAME }),
+    JSON.stringify(configure?.(serverCwd) || { botName: TEST_BOT_NAME }),
   )
 
   serverProc = Bun.spawn(["bun", CONNECTOR_PATH], {
@@ -456,6 +459,80 @@ describe("web connector WebSocket", () => {
     expect(msg2.type).toBe("error")
     expect(msg2.message).toContain("wait")
 
+    ws.close()
+  })
+})
+
+// =============================================================================
+// Image forwarding tests
+// =============================================================================
+
+describe("web connector image forwarding", () => {
+  beforeAll(() => startServer({}, (cwd) => {
+    const mockAcpPath = join(cwd, "mock-acp.js")
+    writeFileSync(mockAcpPath, `
+import readline from "node:readline"
+const lines = readline.createInterface({ input: process.stdin })
+const send = (message) => process.stdout.write(JSON.stringify(message) + "\\n")
+lines.on("line", (line) => {
+  const message = JSON.parse(line)
+  if (message.method === "initialize") {
+    send({ jsonrpc: "2.0", id: message.id, result: {
+      protocolVersion: 1,
+      agentCapabilities: { promptCapabilities: { image: true } },
+      agentInfo: { name: "mock-acp", version: "1" },
+    } })
+  } else if (message.method === "session/new") {
+    send({ jsonrpc: "2.0", id: message.id, result: { sessionId: "mock-session" } })
+  } else if (message.method === "session/prompt") {
+    const count = message.params.prompt.filter((part) => part.type === "image").length
+    send({ jsonrpc: "2.0", method: "session/update", params: {
+      sessionId: "mock-session",
+      update: { sessionUpdate: "agent_message_chunk", content: {
+        type: "text", text: "IMAGE_COUNT:" + count,
+      } },
+    } })
+    send({ jsonrpc: "2.0", id: message.id, result: { stopReason: "end_turn" } })
+  }
+})
+`)
+    return {
+      botName: TEST_BOT_NAME,
+      acp: { command: "bun", args: [mockAcpPath] },
+      web: { attachments: { enabled: true } },
+    }
+  }))
+  afterAll(stopServer)
+
+  test("forwards validated images to ACP instead of response-image counters", async () => {
+    const ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws?clientId=test-image-forwarding`)
+    const imageData = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z1ZsAAAAASUVORK5CYII="
+
+    const response = await new Promise<string>((resolve, reject) => {
+      let chunks = ""
+      const timeout = setTimeout(() => reject(new Error("timeout")), 5000)
+      ws.onerror = reject
+      ws.onmessage = (event) => {
+        const message = JSON.parse(event.data)
+        if (message.type === "connected") {
+          ws.send(JSON.stringify({
+            type: "message",
+            text: "inspect this",
+            images: [{ mimeType: "image/png", data: imageData }],
+          }))
+        } else if (message.type === "chunk") {
+          chunks += message.text
+        } else if (message.type === "error") {
+          clearTimeout(timeout)
+          reject(new Error(message.message))
+        } else if (message.type === "done") {
+          clearTimeout(timeout)
+          resolve(chunks)
+        }
+      }
+    })
+
+    expect(response).toBe("IMAGE_COUNT:1")
     ws.close()
   })
 })

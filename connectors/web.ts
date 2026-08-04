@@ -441,7 +441,7 @@ export class WebConnector extends BaseConnector<WebSession> {
   private async processQuery(
     clientId: string,
     query: string,
-    images: WebPromptImage[] = [],
+    promptImages: WebPromptImage[] = [],
   ): Promise<void> {
     const t0 = Date.now()
 
@@ -483,7 +483,7 @@ export class WebConnector extends BaseConnector<WebSession> {
       let toolResultsBuf = ""
       let tools = 0
       let hadToolActivity = false
-      let images = 0
+      let responseImages = 0
       let chunks = 0
       let activitySequence = 0
       const toolActivity = new ToolActivityController(config.toolMessages, {
@@ -510,7 +510,7 @@ export class WebConnector extends BaseConnector<WebSession> {
       }
 
       const onImage = (img: any) => {
-        images++
+        responseImages++
         const size = img.data ? img.data.length : 0
         this.log(`[IMG] Base64 image received: ${img.mimeType || "unknown"} (${size} chars)`)
         this.wsSend(clientId, {
@@ -577,7 +577,7 @@ export class WebConnector extends BaseConnector<WebSession> {
       let error: unknown = null
       try {
         acpResponse = await Promise.race([
-          client.prompt(query, { images }),
+          client.prompt(query, { images: promptImages }),
           timeoutPromise,
         ])
       } catch (err) {
@@ -599,7 +599,7 @@ export class WebConnector extends BaseConnector<WebSession> {
         toolResultsBuf,
         tools,
         hadToolActivity,
-        images,
+        images: responseImages,
         chunks,
         error,
       }
