@@ -72,6 +72,10 @@
   // ==========================================================================
 
   var STORE_KEY = "oc-widget"
+  var THUMBNAIL_KEY_PREFIX = "oc-thumbnail:"
+  var THUMBNAIL_MAX_DIMENSION = 640
+  var THUMBNAIL_MAX_CHARS = 220000
+  var THUMBNAIL_TOTAL_CHARS = 2000000
   var ws = null
   var state = loadState()
   var clientId = state.clientId || uid()
@@ -114,7 +118,100 @@
         clientId: clientId,
         messages: messages.slice(-50),
       }))
+      removeUnreferencedThumbnails()
     } catch (e) { /* quota etc */ }
+  }
+
+  function currentThumbnailPrefix() {
+    return THUMBNAIL_KEY_PREFIX + clientId + ":"
+  }
+
+  function storedThumbnailEntries() {
+    var entries = []
+    try {
+      for (var i = 0; i < sessionStorage.length; i++) {
+        var key = sessionStorage.key(i)
+        if (!key || key.indexOf(THUMBNAIL_KEY_PREFIX) !== 0) continue
+        var raw = sessionStorage.getItem(key)
+        if (!raw) continue
+        try {
+          var record = JSON.parse(raw)
+          entries.push({
+            key: key,
+            size: raw.length,
+            createdAt: typeof record.createdAt === "number" ? record.createdAt : 0,
+          })
+        } catch (e) {
+          sessionStorage.removeItem(key)
+          i--
+        }
+      }
+    } catch (e) { /* storage unavailable */ }
+    return entries
+  }
+
+  function pruneStoredThumbnails(maxTotalChars) {
+    var entries = storedThumbnailEntries()
+    var keys = WidgetState.thumbnailKeysToEvict(entries, maxTotalChars)
+    for (var i = 0; i < keys.length; i++) {
+      try { sessionStorage.removeItem(keys[i]) } catch (e) { /* storage unavailable */ }
+    }
+  }
+
+  function removeUnreferencedThumbnails() {
+    var referenced = Object.create(null)
+    for (var i = 0; i < messages.length; i++) {
+      var keys = messages[i].thumbnailKeys || []
+      for (var j = 0; j < keys.length; j++) referenced[keys[j]] = true
+    }
+    var prefix = currentThumbnailPrefix()
+    try {
+      for (var k = sessionStorage.length - 1; k >= 0; k--) {
+        var key = sessionStorage.key(k)
+        if (key && key.indexOf(prefix) === 0 && !referenced[key]) {
+          sessionStorage.removeItem(key)
+        }
+      }
+    } catch (e) { /* storage unavailable */ }
+  }
+
+  function clearStoredThumbnails() {
+    var prefix = currentThumbnailPrefix()
+    try {
+      for (var i = sessionStorage.length - 1; i >= 0; i--) {
+        var key = sessionStorage.key(i)
+        if (key && key.indexOf(prefix) === 0) sessionStorage.removeItem(key)
+      }
+    } catch (e) { /* storage unavailable */ }
+  }
+
+  function persistThumbnails(messageId, images) {
+    var keys = []
+    for (var i = 0; i < images.length; i++) {
+      var dataUrl = images[i].thumbnailDataUrl
+      if (!WidgetState.safeThumbnailDataUrl(dataUrl, THUMBNAIL_MAX_CHARS)) continue
+      var key = currentThumbnailPrefix() + messageId + ":" + i
+      var record = JSON.stringify({ dataUrl: dataUrl, createdAt: Date.now() })
+      try {
+        pruneStoredThumbnails(Math.max(0, THUMBNAIL_TOTAL_CHARS - record.length))
+        sessionStorage.setItem(key, record)
+        keys.push(key)
+      } catch (e) { /* quota or storage unavailable */ }
+    }
+    pruneStoredThumbnails(THUMBNAIL_TOTAL_CHARS)
+    return keys
+  }
+
+  function storedThumbnailDataUrl(key) {
+    if (typeof key !== "string" || key.indexOf(currentThumbnailPrefix()) !== 0) return null
+    try {
+      var record = JSON.parse(sessionStorage.getItem(key) || "{}")
+      return WidgetState.safeThumbnailDataUrl(record.dataUrl, THUMBNAIL_MAX_CHARS)
+        ? record.dataUrl
+        : null
+    } catch (e) {
+      return null
+    }
   }
 
   function esc(t) {
@@ -406,7 +503,8 @@
     }
 
     for (var i = 0; i < messages.length; i++) {
-      appendBubble(messages[i].role, messages[i].text)
+      var bubbleElement = appendBubble(messages[i].role, messages[i].text)
+      appendStoredThumbnails(bubbleElement, messages[i].thumbnailKeys || [])
     }
     scrollDown()
   }
@@ -428,6 +526,18 @@
     }
     msgsEl.insertBefore(el, thinkingEl)
     return el
+  }
+
+  function appendStoredThumbnails(bubbleElement, keys) {
+    for (var i = 0; i < keys.length; i++) {
+      var dataUrl = storedThumbnailDataUrl(keys[i])
+      if (!dataUrl) continue
+      var preview = document.createElement("img")
+      preview.className = "oc-msg-thumbnail"
+      preview.src = dataUrl
+      preview.alt = "Attached image thumbnail"
+      bubbleElement.appendChild(preview)
+    }
   }
 
   function renderBotText(bubbleElement, text) {
@@ -587,7 +697,40 @@
       throw new Error("Resized image still exceeds the upload limit.")
     }
     var data = await blobToBase64(blob)
-    return { mimeType: blob.type || file.type, data: data, width: width, height: height }
+    var thumbnailDataUrl = ""
+    try { thumbnailDataUrl = await createThumbnailDataUrl(blob) } catch (e) { /* optional preview */ }
+    return {
+      mimeType: blob.type || file.type,
+      data: data,
+      width: width,
+      height: height,
+      thumbnailDataUrl: thumbnailDataUrl,
+    }
+  }
+
+  async function createThumbnailDataUrl(blob) {
+    var bitmap = await createImageBitmap(blob)
+    try {
+      var scale = Math.min(1, THUMBNAIL_MAX_DIMENSION / Math.max(bitmap.width, bitmap.height))
+      var width = Math.max(1, Math.round(bitmap.width * scale))
+      var height = Math.max(1, Math.round(bitmap.height * scale))
+      var canvas = document.createElement("canvas")
+      canvas.width = width
+      canvas.height = height
+      var context = canvas.getContext("2d")
+      if (!context) throw new Error("Canvas is unavailable.")
+      context.drawImage(bitmap, 0, 0, width, height)
+      var thumbnail = await new Promise(function (resolve, reject) {
+        canvas.toBlob(function (result) {
+          if (result) resolve(result)
+          else reject(new Error("Could not create thumbnail."))
+        }, "image/webp", 0.75)
+      })
+      var dataUrl = "data:image/webp;base64," + await blobToBase64(thumbnail)
+      return WidgetState.safeThumbnailDataUrl(dataUrl, THUMBNAIL_MAX_CHARS) ? dataUrl : ""
+    } finally {
+      bitmap.close()
+    }
   }
 
   function blobToBase64(blob) {
@@ -666,7 +809,12 @@
       displayText += (displayText ? "\n" : "") +
         "[Attached " + outgoingImages.length + " image" + (outgoingImages.length === 1 ? "" : "s") + "]"
     }
-    var userBubble = addMsg("user", displayText)
+    var messageId = uid()
+    var thumbnailKeys = persistThumbnails(messageId, outgoingImages)
+    var userBubble = addMsg("user", displayText, {
+      id: messageId,
+      thumbnailKeys: thumbnailKeys,
+    })
     outgoingImages.forEach(function (image) {
       var preview = document.createElement("img")
       preview.src = "data:" + image.mimeType + ";base64," + image.data
@@ -699,8 +847,13 @@
     }
   }
 
-  function addMsg(role, text) {
-    messages.push({ role: role, text: text, ts: Date.now() })
+  function addMsg(role, text, details) {
+    var message = { role: role, text: text, ts: Date.now() }
+    if (details && details.id) message.id = details.id
+    if (details && details.thumbnailKeys && details.thumbnailKeys.length > 0) {
+      message.thumbnailKeys = details.thumbnailKeys
+    }
+    messages.push(message)
     var bubbleElement = appendBubble(role, text)
     scrollDown()
     saveState()
@@ -709,6 +862,7 @@
 
   function clearChat() {
     clearSelectedImages()
+    clearStoredThumbnails()
     // Send /clear to server if connected
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: "message", text: "/clear" }))
@@ -898,6 +1052,7 @@
 
       case "session_state":
         if (WidgetState.shouldClearHistory(d)) {
+          clearStoredThumbnails()
           messages = []
           saveState()
           renderHistory()

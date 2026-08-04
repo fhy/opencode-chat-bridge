@@ -62,6 +62,24 @@
     return null
   }
 
+  function safeThumbnailDataUrl(value, maxChars) {
+    return typeof value === "string" &&
+      value.length <= maxChars &&
+      /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(value)
+  }
+
+  function thumbnailKeysToEvict(entries, maxTotalChars) {
+    var total = entries.reduce(function (sum, entry) { return sum + entry.size }, 0)
+    if (total <= maxTotalChars) return []
+    var oldestFirst = entries.slice().sort(function (a, b) { return a.createdAt - b.createdAt })
+    var keys = []
+    for (var i = 0; i < oldestFirst.length && total > maxTotalChars; i++) {
+      total -= oldestFirst[i].size
+      keys.push(oldestFirst[i].key)
+    }
+    return keys
+  }
+
   function positiveTimeout(value, fallback) {
     return typeof value === "number" && Number.isFinite(value) && value > 0
       ? value
@@ -71,6 +89,8 @@
   global.OpenCodeWidgetState = {
     shouldClearHistory: shouldClearHistory,
     imageDimensions: imageDimensions,
+    safeThumbnailDataUrl: safeThumbnailDataUrl,
+    thumbnailKeysToEvict: thumbnailKeysToEvict,
     positiveTimeout: positiveTimeout,
   }
 })(typeof window !== "undefined" ? window : globalThis)

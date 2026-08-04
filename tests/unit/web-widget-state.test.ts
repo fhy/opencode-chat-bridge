@@ -8,6 +8,11 @@ type WidgetStateHelpers = {
     hasSession?: boolean
   } | null): boolean
   imageDimensions(bytes: Uint8Array, mimeType: string): { width: number; height: number } | null
+  safeThumbnailDataUrl(value: unknown, maxChars: number): boolean
+  thumbnailKeysToEvict(
+    entries: Array<{ key: string; size: number; createdAt: number }>,
+    maxTotalChars: number,
+  ): string[]
   positiveTimeout(value: unknown, fallback: number): number
 }
 
@@ -68,6 +73,24 @@ describe("Web widget connection state", () => {
     png.writeUInt32BE(50_000, 16)
     expect(helpers.imageDimensions(png, "image/png")).toEqual({ width: 50_000, height: 1 })
     expect(helpers.imageDimensions(png, "image/jpeg")).toBeNull()
+  })
+
+  test("accepts bounded passive thumbnail data URLs only", () => {
+    expect(helpers.safeThumbnailDataUrl("data:image/webp;base64,YQ==", 100)).toBe(true)
+    expect(helpers.safeThumbnailDataUrl("data:image/png;base64,YQ==", 10)).toBe(false)
+    expect(helpers.safeThumbnailDataUrl("data:image/svg+xml;base64,YQ==", 100)).toBe(false)
+    expect(helpers.safeThumbnailDataUrl("javascript:alert(1)", 100)).toBe(false)
+  })
+
+  test("evicts oldest thumbnails to meet the session budget", () => {
+    expect(helpers.thumbnailKeysToEvict([
+      { key: "new", size: 50, createdAt: 30 },
+      { key: "old", size: 70, createdAt: 10 },
+      { key: "middle", size: 60, createdAt: 20 },
+    ], 100)).toEqual(["old", "middle"])
+    expect(helpers.thumbnailKeysToEvict([
+      { key: "kept", size: 50, createdAt: 10 },
+    ], 100)).toEqual([])
   })
 
   test("accepts only finite positive timeout overrides", () => {

@@ -181,8 +181,10 @@ Set `publicUrl` so embed snippets show the correct URL:
 When `web.attachments.enabled` is true, users can select an image or paste one
 into the composer with Ctrl+V. The browser validates compressed size and decoded
 dimensions, resizes safe oversized images before sending, displays a removable
-preview, and requires an explicit Send action. Image bytes are not written to
-localStorage or the session workspace.
+preview, and requires an explicit Send action. Original image bytes are not
+written to localStorage or the session workspace. A reduced thumbnail may be
+kept in sessionStorage so sent-image previews survive page reloads; it is
+removed when chat history is cleared and is bounded by a browser-session budget.
 
 The server independently verifies base64 size, MIME allowlisting, file magic,
 dimensions, and pixel count before forwarding native image content to ACP. SVG

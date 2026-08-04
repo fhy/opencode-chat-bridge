@@ -29,7 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Configurable Web image input** - Protected deployments can enable validated
   JPEG, PNG, and WebP selection or clipboard paste. Images are previewed,
   optionally resized in-browser, revalidated server-side, and sent as native
-  ACP prompt content without persisting image bytes in localStorage or workspaces.
+  ACP prompt content without persisting original image bytes in localStorage or
+  workspaces. Bounded sessionStorage thumbnails survive page reloads.
 
 ## [0.6.0] - 2026-07-26
 
