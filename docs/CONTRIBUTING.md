@@ -178,39 +178,57 @@ bun src/cli.ts "Read /etc/passwd"  # Should be blocked
 
 ## Pull Request Process
 
+### Discuss Changes First
+
+Open an issue and wait for maintainer agreement before implementing:
+
+- New features or connectors
+- Behavior, configuration, architecture, packaging, deployment, or policy changes
+- Large refactors or changes spanning multiple connectors
+- Anything likely to require more than a small, focused patch
+
+Agreement that a problem exists is not approval of a proposed implementation. Unsolicited or out-of-scope pull requests may be closed without detailed review.
+
+### Submission Limits
+
+- Keep at most one implementation pull request open at a time.
+- Do not submit dependent or stacked pull requests without prior agreement.
+- Update an existing pull request rather than opening replacements or duplicates.
+- Wait for the current review to conclude before starting another implementation.
+
+These limits protect the project's review capacity. Maintainers may close excess submissions and ask the contributor to pause.
+
+### AI-Assisted Contributions
+
+AI-assisted contributions are accepted only when a human contributor:
+
+- Reviews and understands the complete change before submission
+- Submits it from their own account and takes responsibility for it
+- Verifies the implementation and tests against real behavior
+- Responds directly to technical review
+
+Pull requests from autonomous or delegated agent accounts are not accepted. Generated test volume is not evidence of correctness. Tests must exercise the changed production path rather than restating or reproducing the implementation in test code.
+
 ### Before Submitting
 
-1. Test your changes manually
-2. Update documentation if needed
-3. Add to CHANGELOG if significant
+1. Confirm that the implementation was requested or approved in an issue.
+2. Rebase on the current default branch.
+3. Add focused regression tests that fail without the change.
+4. Test the affected connector manually when practical.
+5. Run `bun run check`.
+6. Update documentation and `CHANGELOG.md` when appropriate.
+7. Review the final diff for unrelated, duplicated, generated, or speculative changes.
 
 ### PR Requirements
 
-- Clear title describing the change
-- Description of what and why
-- Reference related issues
-- Include test evidence if applicable
+- A focused change with a clear title and rationale
+- A linked, approved issue when prior discussion is required
+- Production-path regression tests
+- Exact automated and manual verification performed
+- No unrelated cleanup or API expansion
+- No unresolved dependencies on other pull requests
 
-### PR Template
-
-```markdown
-## Description
-Brief description of changes
-
-## Type of Change
-- [ ] Bug fix
-- [ ] New feature
-- [ ] New connector
-- [ ] Documentation update
-
-## Testing
-How was this tested?
-
-## Checklist
-- [ ] Manual testing passed
-- [ ] Documentation updated
-- [ ] Code follows style guide
-```
+Maintainers may close pull requests that do not meet these requirements without iterating on generated revisions.
 
 ## Reporting Issues
 
