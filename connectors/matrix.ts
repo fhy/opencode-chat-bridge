@@ -84,6 +84,7 @@ const TOKEN_FILE_PATH = path.join(STORAGE_PATH, "access_token")
 export {
   type MatrixEventContext,
   extractThreadRootId,
+  extractBotNameQuery,
   resolveThreadRoot,
   buildMatrixSessionId,
   normalizeMatrixEventContext,
@@ -93,6 +94,7 @@ export {
 import {
   type MatrixEventContext,
   extractThreadRootId,
+  extractBotNameQuery,
   normalizeMatrixEventContext,
   buildThreadRelation,
   shouldHandleThreadReply,
@@ -389,14 +391,15 @@ export class MatrixConnector extends BaseConnector<RoomSession> {
 
     // Extract query
     let query = ""
+    const botNameQuery = extractBotNameQuery(body, BOT_NAME)
     if (body.startsWith(TRIGGER + " ")) {
       query = body.slice(TRIGGER.length + 1).trim()
     } else if (body.startsWith(TRIGGER)) {
       query = body.slice(TRIGGER.length).trim()
     } else if (body.includes(myUserId)) {
       query = body.replace(myUserId, "").trim()
-    } else if (body.match(/^@?bot[:\s]/i)) {
-      query = body.replace(/^@?bot[:\s]*/i, "").trim()
+    } else if (botNameQuery !== null) {
+      query = botNameQuery
     } else if (isDM) {
       query = body
     } else if (this.threadIsolation && shouldHandleThreadReply({
