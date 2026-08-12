@@ -100,6 +100,7 @@ import {
   shouldHandleThreadReply,
 } from "./matrix-thread-helpers"
 import { diagnoseEmptyResponse } from "../src/acp-response-diagnostics"
+import { resolveMatrixAccessToken, writePrivateFileAtomically } from "./matrix-auth"
 
 // =============================================================================
 // Session Type
@@ -319,21 +320,35 @@ export class MatrixConnector extends BaseConnector<RoomSession> {
   // ---------------------------------------------------------------------------
 
   private async getOrCreateAccessToken(): Promise<string | null> {
-    if (ACCESS_TOKEN) {
-      this.log("Using access token from config/env")
-      return ACCESS_TOKEN
-    }
-    if (fs.existsSync(TOKEN_FILE_PATH)) {
-      const savedToken = fs.readFileSync(TOKEN_FILE_PATH, "utf-8").trim()
-      if (savedToken) {
-        this.log("Using saved access token")
-        return savedToken
+    let savedToken = ""
+    try {
+      if (fs.existsSync(TOKEN_FILE_PATH)) {
+        savedToken = fs.readFileSync(TOKEN_FILE_PATH, "utf-8").trim()
       }
+    } catch (err) {
+      this.logError("Failed to read saved Matrix access token:", err)
+      throw err
     }
-    if (PASSWORD) {
-      return await this.loginWithPassword()
-    }
-    return null
+
+    return resolveMatrixAccessToken({
+      explicitToken: ACCESS_TOKEN || "",
+      savedToken,
+      passwordConfigured: Boolean(PASSWORD),
+      expectedUserId: USER_ID || "",
+    }, {
+      validateToken: async (token) => {
+        const client = new MatrixClient(HOMESERVER, token)
+        const whoami = await client.getWhoAmI()
+        return { userId: whoami.user_id }
+      },
+      loginWithPassword: () => this.loginWithPassword(),
+      saveToken: (token) => this.saveAccessToken(token),
+      log: (message) => this.log(message),
+    })
+  }
+
+  private saveAccessToken(accessToken: string): void {
+    writePrivateFileAtomically(TOKEN_FILE_PATH, accessToken)
   }
 
   private async loginWithPassword(): Promise<string | null> {
@@ -343,8 +358,7 @@ export class MatrixConnector extends BaseConnector<RoomSession> {
       const username = USER_ID!.split(":")[0].replace("@", "")
       const client = await auth.passwordLogin(username, PASSWORD!, "OpenCode Chat Bridge")
       const accessToken = client.accessToken
-      fs.writeFileSync(TOKEN_FILE_PATH, accessToken)
-      this.log(`Login successful! Token saved to ${TOKEN_FILE_PATH}`)
+      this.log("Password login successful")
       return accessToken
     } catch (err: any) {
       this.logError("Password login failed:", err.message || err)

@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Matrix cached-token recovery** - Password-based Matrix login validates its
+  cached token at startup and logs in again only when Matrix rejects the token
+  or it belongs to another configured user. Temporary network and homeserver
+  failures do not replace valid credentials.
 - **Web tool trace line breaks** - Activity and trace messages now preserve
   newlines and safely wrap long lines in widget, embedded, and full-page modes.
 - **Web reconnect state** - Session confirmation no longer clears queued or
