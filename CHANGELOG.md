@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **ACP debug log startup** - `BRIDGE_DEBUG=1` now creates the missing `logs/`
+  directory automatically. Trace-write failures disable debugging without
+  interrupting connector processing.
 - **Matrix cached-token recovery** - Password-based Matrix login validates its
   cached token at startup and logs in again only when Matrix rejects the token
   or it belongs to another configured user. Temporary network and homeserver
