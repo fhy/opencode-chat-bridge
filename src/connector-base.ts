@@ -959,6 +959,7 @@ export abstract class BaseConnector<TSession extends BaseSession> {
       cwd,
       command: this.acpConfig.command,
       args: this.acpConfig.args,
+      autoApprove: this.acpConfig.autoApprove,
     })
   }
 

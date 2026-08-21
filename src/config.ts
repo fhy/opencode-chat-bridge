@@ -113,6 +113,8 @@ export interface ACPConfig {
   args: string[]
   backendId: string
   profileDir: string
+  projectDir: string
+  autoApprove?: boolean
 }
 
 export interface SessionPickerConfig {
@@ -180,6 +182,7 @@ const defaultConfig: ChatBridgeConfig = {
     args: ["acp"],
     backendId: "",
     profileDir: "",
+    projectDir: "",
   },
   matrix: {
     enabled: false,
@@ -372,7 +375,10 @@ export function loadConfig(configPath?: string): ChatBridgeConfig {
   
   const searchPaths = configPath 
     ? [configPath]
-    : [path.join(process.cwd(), "chat-bridge.json")]
+    : [
+        process.env.CHAT_BRIDGE_CONFIG || "",
+        path.join(process.cwd(), "chat-bridge.json"),
+      ].filter(Boolean)
   
   for (const filePath of searchPaths) {
     if (fs.existsSync(filePath)) {

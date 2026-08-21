@@ -139,9 +139,20 @@ export function copyOpenCodeConfig(sessionDir: string, projectDir?: string): voi
   
   copyIfNewer(sourceDir, sessionDir, "opencode.json")
   copyIfNewer(sourceDir, sessionDir, "AGENTS.md")
+  copyIfNewer(sourceDir, sessionDir, "CLAUDE.md")
   
   // Symlink .opencode directory for skills, tools, commands
   symlinkDir(sourceDir, sessionDir, ".opencode")
+
+  // opencode looks for config in .opencode/opencode.json
+  const opencodeConfigSrc = path.join(sessionDir, "opencode.json")
+  const opencodeDir = path.join(sessionDir, ".opencode")
+  if (fs.existsSync(opencodeConfigSrc) && fs.existsSync(opencodeDir)) {
+    const dest = path.join(opencodeDir, "opencode.json")
+    try {
+      fs.copyFileSync(opencodeConfigSrc, dest)
+    } catch { /* ignore */ }
+  }
 }
 
 /**

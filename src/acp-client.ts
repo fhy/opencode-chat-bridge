@@ -50,6 +50,7 @@ export interface ACPClientOptions {
   mcpServers?: MCPServer[]
   command?: string
   args?: string[]
+  autoApprove?: boolean
 }
 
 export interface MCPServer {
@@ -146,6 +147,7 @@ export class ACPClient extends EventEmitter {
     toolName: string
     args: any
   }>()
+  private autoApprove: boolean
   
   constructor(options: ACPClientOptions = {}) {
     super()
@@ -155,6 +157,7 @@ export class ACPClient extends EventEmitter {
       ? findOpencode()
       : options.command
     this.args = options.args || ["acp"]
+    this.autoApprove = options.autoApprove ?? false
   }
   
   /**
@@ -532,7 +535,7 @@ export class ACPClient extends EventEmitter {
       return
     }
     
-    // Handle permission requests - auto-reject with message
+    // Handle permission requests
     if (msg.method === "session/request_permission") {
       this.handlePermissionRequest(msg)
       return
@@ -566,25 +569,48 @@ export class ACPClient extends EventEmitter {
     // Format message - if no path available, just show the permission type
     const displayPath = path || title
     
-    console.error(`[ACP] Permission requested: ${title} - auto-rejecting`)
+    const outcome = this.autoApprove ? "accept" : "reject"
+    console.error(`[ACP] Permission requested: ${title} - ${outcome}`)
     
-    // Emit an event so the connector can show the user what happened
-    // Only show path if it's different from the permission type
-    const showPath = path && path !== title
-    this.emit("permission_rejected", {
-      permission: title,
-      path: path || null,
-      message: showPath ? `Permission denied: ${title} (${path})` : `Permission denied: ${title}`,
-    })
+    if (!this.autoApprove) {
+      // Emit an event so the connector can show the user what happened
+      const showPath = path && path !== title
+      this.emit("permission_rejected", {
+        permission: title,
+        path: path || null,
+        message: showPath ? `Permission denied: ${title} (${path})` : `Permission denied: ${title}`,
+      })
+    }
     
-    // Send rejection response
+    // Find the correct optionId from the options opencode sent
+    // Options look like: [{optionId:"once",kind:"allow_once",...}, {optionId:"always",kind:"allow_always",...}, ...]
+    const options = params.options || []
+    let optionId: string
+    if (this.autoApprove) {
+      // Find the first allow-like option, prefer "always" > "once" > first option
+      const allowOption = options.find((o: any) => o.kind?.includes("always") || o.optionId === "always")
+        || options.find((o: any) => o.kind?.includes("once") || o.optionId === "once")
+        || options.find((o: any) => o.kind?.includes("allow"))
+        || options[0]
+      optionId = allowOption?.optionId || "once"
+    } else {
+      // Find the reject/deny option
+      const denyOption = options.find((o: any) => o.kind?.includes("deny") || o.kind?.includes("reject"))
+        || options.find((o: any) => !o.kind?.includes("allow"))
+        || options[0]
+      optionId = denyOption?.optionId || "deny"
+    }
+    
+    console.error(`[ACP] Permission response: optionId=${optionId}`)
+    
+    // Send response
     const response = {
       jsonrpc: "2.0",
       id: msg.id,
       result: {
         outcome: {
           outcome: "selected",
-          optionId: "reject",
+          optionId,
         },
       },
     }

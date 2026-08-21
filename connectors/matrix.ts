@@ -165,9 +165,11 @@ export class MatrixConnector extends BaseConnector<RoomSession> {
     LogService.muteModule("Metrics")
 
     const stateStorage = new SimpleFsStorageProvider(STATE_STORAGE_PATH)
-    const cryptoStorage = new RustSdkCryptoStorageProvider(CRYPTO_STORAGE_PATH)
+    const cryptoStorage = config.matrix.encryption.enabled
+      ? new RustSdkCryptoStorageProvider(CRYPTO_STORAGE_PATH)
+      : undefined
 
-    this.matrix = new MatrixClient(HOMESERVER, accessToken, stateStorage, cryptoStorage)
+    this.matrix = new MatrixClient(HOMESERVER, accessToken, stateStorage, cryptoStorage ?? undefined)
     AutojoinRoomsMixin.setupOnClient(this.matrix)
 
     this.matrix.on("room.failed_decryption", async (roomId: string, event: any, error: Error) => {
