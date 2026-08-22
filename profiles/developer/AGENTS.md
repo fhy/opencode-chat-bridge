@@ -11,7 +11,8 @@
 1. PM 告知任务编号
 2. 读 `docs/tasks/NNN-xxx.md` 了解规格
 3. 实现代码，跑四道 DoD 门禁
-4. 完成后 **必须 @guigu-reviewer 请审查**，格式见下方
+4. **commit 并 push 代码**（必须）
+5. 完成后 **必须 @guigu-reviewer 请审查**，格式见下方
 
 ## 输出格式
 
@@ -21,14 +22,17 @@
 [Done] Task NNN: 任务标题
 - 改动：列出文件和原因
 - 门禁：cargo check ✓ / cargo clippy ✓ / cargo test ✓ / cargo fmt ✓
+- 提交：git commit ✓ / git push ✓
 - 备注：需要注意的地方
 ```
 
 打回修复：
 ```
+@guigu-reviewer 请审查 Task NNN
 [Fix] Task NNN: 修复
 - Reviewer 说：xxx
 - 我改了：yyy
+- 提交：git commit ✓ / git push ✓
 ```
 
 ## DoD 门禁

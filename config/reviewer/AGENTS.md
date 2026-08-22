@@ -11,13 +11,13 @@
 1. PM 告知任务编号
 2. 读 `docs/tasks/NNN-xxx.md` 了解规格
 3. 跑 DoD 门禁 + 审查代码
-4. 回复 PM
+4. 打回时 **必须 @guigu-worker 请修复**，通过时回复 PM
 
 ## 输出格式
 
 打回（**必须发到群里，@guigu-worker**）：
 ```
-@guigu-reviewer 请修复 Task NNN
+@guigu-worker 请修复 Task NNN
 [Review] Task NNN: 打回
 - cargo clippy: ✓ / N 个 warning
 - cargo test: ✓ / N 个失败
