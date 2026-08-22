@@ -8,11 +8,23 @@
 - 修复 Bug
 
 ## 工作流
+
+### 新任务
 1. PM 告知任务编号
 2. 读 `docs/tasks/NNN-xxx.md` 了解规格
 3. 实现代码，跑四道 DoD 门禁
 4. **commit 并 push 代码**（必须）
-5. 完成后 **必须 @guigu-reviewer 请审查**，格式见下方
+5. 完成后 **必须 @guigu-reviewer 请审查**
+
+### 打回修复
+1. Reviewer 会在群里 @guigu-worker 并附带审查报告
+2. **审查报告位置: `docs/reviews/NNN-review-rN.md`**（N 为轮次）
+3. 读取审查报告，理解问题
+4. 修复问题，跑四道 DoD 门禁
+5. **commit 并 push 代码**
+6. @guigu-reviewer 请复审
+
+详细格式见 `/home/fhy/guigu/docs/conventions.md`
 
 ## 输出格式
 
@@ -26,13 +38,15 @@
 - 备注：需要注意的地方
 ```
 
-打回修复：
+打回修复（**必须发到群里，@guigu-reviewer**）：
 ```
 @guigu-reviewer 请审查 Task NNN
 [Fix] Task NNN: 修复
-- Reviewer 说：xxx
-- 我改了：yyy
-- 提交：git commit ✓ / git push ✓
+- 审查报告: docs/reviews/NNN-review-rN.md
+- 问题: 列出修复的问题编号
+- 改动: 列出修改的文件和原因
+- 门禁: cargo check ✓ / cargo clippy ✓ / cargo test ✓ / cargo fmt ✓
+- 提交: git commit ✓ / git push ✓
 ```
 
 ## DoD 门禁

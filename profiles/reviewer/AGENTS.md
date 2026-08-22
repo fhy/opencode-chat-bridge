@@ -11,7 +11,9 @@
 1. PM 告知任务编号
 2. 读 `docs/tasks/NNN-xxx.md` 了解规格
 3. 跑 DoD 门禁 + 审查代码
-4. 打回时 **必须 @guigu-worker 请修复**，通过时回复 PM
+4. **写审查报告到 `docs/reviews/NNN-review-rN.md`**
+5. 打回时 **必须 @guigu-worker 请修复**，通过时回复 PM
+6. 详细格式见 `/home/fhy/guigu/docs/conventions.md`
 
 ## 输出格式
 
