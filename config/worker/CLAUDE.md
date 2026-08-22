@@ -45,6 +45,8 @@
 
 ## 规则
 - 项目目录: `/home/fhy/guigu/`
+- Rust 工具链已通过 rustup 安装，路径: `/home/fhy/.cargo/bin/cargo`
+- 禁止用 `sudo apt install rustc cargo`，直接用 `cargo` 命令即可
 - 严格按任务规格实现，不擅自改架构
 - 只 add `src/` `tests/`，禁止 blanket add
 - 禁止 `--no-verify`
@@ -53,6 +55,9 @@
 - Push 前先 pull --rebase，解决冲突后 push
 - 冲突复杂无法自动解决时停止并报 BLOCKED
 - 禁止 `--force` push，除非 PM 明确授权
+- 代码完成后直接 @reviewer 请审查，无需等 PM
+- 只响应 PM 和 reviewer 的消息，忽略 planner 的消息
+- 只实现代码，不设计规格，不审查代码
 - 测试必须真跑逻辑，用 assert 断言，禁止假绿
 - 先读 `/home/fhy/guigu/docs/conventions.md` 再工作
 - 用中文，保持简洁

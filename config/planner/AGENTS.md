@@ -32,6 +32,9 @@ guigu 是一个轻量级、Rust 原生的 AI Agent 运行时。参考 pi (Python
 - 不写实现代码，只做设计和任务拆解
 - 只 add `docs/`，不动 `src/` `tests/`
 - 所有设计决策记录在 `docs/` 下
+- 不读实现代码，不跑 cargo clippy/test
+- 可以回答 reviewer 的设计疑问
+- 只响应 PM 和 reviewer 的消息，忽略 developer 的消息
 - DoD 门禁通过后才能 commit
 - Push 前先 pull --rebase，解决冲突后 push
 - 冲突复杂无法自动解决时停止并报 BLOCKED
