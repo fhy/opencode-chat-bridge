@@ -429,6 +429,10 @@ export class MatrixConnector extends BaseConnector<RoomSession> {
       // Implicit thread follow-up
       query = body
       this.log(`[THREAD] ${message.sender} in ${context.sessionId}: ${body}`)
+    } else if (body.includes(myUserId)) {
+      // Main thread @mention - handle even without thread context
+      query = body.replace(myUserId, "").trim()
+      this.log(`[MENTION] ${message.sender} in ${context.sessionId}: ${body}`)
     } else {
       return
     }
