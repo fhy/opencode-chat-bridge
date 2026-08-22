@@ -216,7 +216,8 @@ export class MatrixConnector extends BaseConnector<RoomSession> {
    */
   private async sendReply(context: MatrixEventContext, text: string): Promise<string | null> {
     try {
-      if (this.threadIsolation) {
+      const needsMainThread = /@guigu-/.test(text)
+      if (this.threadIsolation && !needsMainThread) {
         const session = this.sessionManager.get(context.sessionId)
         const lastEventId = session?.lastEventIds.get(context.replyThreadRootId) || context.replyThreadRootId
         const relation = buildThreadRelation(context.replyThreadRootId, lastEventId)
@@ -246,6 +247,7 @@ export class MatrixConnector extends BaseConnector<RoomSession> {
         }
         return eventId
       } else {
+        // Send to main thread (non-thread message)
         await this.sendMessage(context.roomId, text)
         return null
       }

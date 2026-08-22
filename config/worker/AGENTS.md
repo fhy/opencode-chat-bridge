@@ -11,12 +11,13 @@
 1. PM 告知任务编号
 2. 读 `docs/tasks/NNN-xxx.md` 了解规格
 3. 实现代码，跑四道 DoD 门禁
-4. 回复 PM
+4. 完成后 **必须 @guigu-reviewer 请审查**，格式见下方
 
 ## 输出格式
 
-完成：
+完成（**必须发到群里，@guigu-reviewer**）：
 ```
+@guigu-reviewer 请审查 Task NNN: 任务标题
 [Done] Task NNN: 任务标题
 - 改动：列出文件和原因
 - 门禁：cargo check ✓ / cargo clippy ✓ / cargo test ✓ / cargo fmt ✓
