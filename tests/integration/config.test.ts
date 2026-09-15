@@ -152,6 +152,7 @@ describe("config", () => {
       expect(config.toolMessages.maxTraceEntries).toBe(20)
     })
 
+
     test("merges and normalizes Web attachment limits", () => {
       fs.writeFileSync(
         path.join(testDir, "chat-bridge.json"),

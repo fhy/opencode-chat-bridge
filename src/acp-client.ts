@@ -183,9 +183,20 @@ export class ACPClient extends EventEmitter {
   async connect(): Promise<void> {
     console.log(`[ACP] Starting executable: ${this.command} (${this.args.length} argument(s))`)
     
+    // Reviewer sessions run in a sandbox with a minimal environment. Keep
+    // rustup-installed tools (cargo, rustc, clippy, and test binaries) visible
+    // to OpenCode and to commands it launches from the ACP session.
+    const cargoBin = join(homedir(), ".cargo", "bin")
+    const pathEntries = (process.env.PATH || "").split(":").filter(Boolean)
+    const env = {
+      ...process.env,
+      PATH: [cargoBin, ...pathEntries.filter((entry) => entry !== cargoBin)].join(":"),
+    }
+
     this.acp = spawn(this.command, this.args, {
       stdio: ["pipe", "pipe", "pipe"],
       cwd: this.cwd,
+      env,
     })
     
     this.acp.stdout!.on("data", (data) => this.handleData(data))
@@ -514,7 +525,7 @@ export class ACPClient extends EventEmitter {
     this.buffer += data.toString()
     const lines = this.buffer.split("\n")
     this.buffer = lines.pop() || ""
-    
+
     for (const line of lines) {
       if (!line.trim()) continue
       try {

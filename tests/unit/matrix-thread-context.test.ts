@@ -93,10 +93,10 @@ describe("resolveMatrixBotRoute", () => {
 
   test("accepts local and full Matrix user IDs", () => {
     expect(resolveMatrixBotRoute("@bridge-reviewer review T001", bots).target).toBe("bridge-reviewer")
-    expect(resolveMatrixBotRoute("@bridge-coordinator:matrix.example plan T001", bots)).toEqual({
-      target: "bridge-coordinator",
-      query: "plan T001",
-    })
+    expect(resolveMatrixBotRoute(
+      "@bridge-coordinator:matrix.example plan T001",
+      bots,
+    )).toEqual({ target: "bridge-coordinator", query: "plan T001" })
   })
 
   test("does not treat unaddressed or partial names as targets", () => {

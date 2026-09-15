@@ -159,6 +159,7 @@ export interface ChatBridgeConfig {
   discord: DiscordConfig
   telegram: TelegramConfig
   web: WebConfig
+  monitorMode?: boolean  // Only log messages, don't process
 }
 
 // Default configuration

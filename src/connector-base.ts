@@ -315,6 +315,7 @@ export interface ConnectorConfig {
   sessionRetentionDays: number // 7 (startup cleanup)
   sessionRetentionMins?: number // 30 (runtime expiry, optional)
   allowedUsers?: string[]
+  monitorMode?: boolean       // Only log messages, don't process
 }
 
 export function parseCsvList(value?: string): string[] {

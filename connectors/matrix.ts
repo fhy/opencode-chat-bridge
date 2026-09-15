@@ -69,6 +69,7 @@ const SESSION_RETENTION_DAYS = parseInt(process.env.SESSION_RETENTION_DAYS || "7
 const THREAD_ISOLATION = config.matrix.threadIsolation
 const ENV_ALLOWED_USERS = parseCsvList(process.env.MATRIX_ALLOWED_USERS)
 const ALLOWED_USERS = ENV_ALLOWED_USERS.length > 0 ? ENV_ALLOWED_USERS : config.matrix.allowedUsers
+const MONITOR_MODE = config.monitorMode || false
 const MATRIX_BOT_NAMES = [BOT_NAME, ...config.matrix.peerBotNames]
 
 // Storage paths
@@ -130,6 +131,7 @@ export class MatrixConnector extends BaseConnector<RoomSession> {
       rateLimitSeconds: RATE_LIMIT_SECONDS,
       sessionRetentionDays: SESSION_RETENTION_DAYS,
       allowedUsers: ALLOWED_USERS,
+      monitorMode: MONITOR_MODE,
     })
     this.threadIsolation = THREAD_ISOLATION
   }
@@ -150,6 +152,9 @@ export class MatrixConnector extends BaseConnector<RoomSession> {
     console.log(`  User: ${USER_ID}`)
     console.log(`  Storage: ${STORAGE_PATH}`)
     console.log(`  E2EE: enabled (Rust crypto with SQLite)`)
+    if (this.config.monitorMode) {
+      console.log(`  Monitor mode: ON (messages logged, not processed)`)
+    }
     this.logStartup()
     console.log(`  Thread isolation: ${this.threadIsolation ? "on (per-thread sessions)" : "off (per-room sessions)"}`)
     await this.cleanupSessions()
@@ -387,6 +392,13 @@ export class MatrixConnector extends BaseConnector<RoomSession> {
 
     const myUserId = await this.matrix!.getUserId()
     if (message.sender === myUserId) return
+
+    // Monitor mode: log everything, no user filtering
+    if (this.config.monitorMode) {
+      this.log(`[MONITOR] ${message.sender} in ${roomId}: ${message.textBody.trim()}`)
+      return
+    }
+
     if (!this.isUserAllowed(message.sender)) return
 
     const body = message.textBody.trim()
@@ -441,6 +453,9 @@ export class MatrixConnector extends BaseConnector<RoomSession> {
       query = body.replace(myUserId, "").trim()
     } else if (botNameQuery !== null) {
       query = botNameQuery
+    } else if (body.toLowerCase().includes(`@${BOT_NAME.toLowerCase()}`)) {
+      // Bare mention anywhere in text (e.g. from reviewer's model output)
+      query = body.replace(new RegExp(`@${BOT_NAME}`, "gi"), "").trim()
     } else if (isDM) {
       query = body
     } else if (this.threadIsolation && config.matrix.handleUnaddressed && shouldHandleThreadReply({
@@ -452,10 +467,6 @@ export class MatrixConnector extends BaseConnector<RoomSession> {
       // Implicit thread follow-up
       query = body
       this.log(`[THREAD] ${message.sender} in ${context.sessionId}: ${body}`)
-    } else if (body.includes(myUserId)) {
-      // Main thread @mention - handle even without thread context
-      query = body.replace(myUserId, "").trim()
-      this.log(`[MENTION] ${message.sender} in ${context.sessionId}: ${body}`)
     } else {
       return
     }
