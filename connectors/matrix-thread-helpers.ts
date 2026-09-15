@@ -54,6 +54,38 @@ export function extractBotNameQuery(text: string, botName: string): string | nul
   return null
 }
 
+export interface MatrixBotRoute {
+  target: string | null
+  query: string
+}
+
+/** Resolve an explicit leading bot target in a shared Matrix room. */
+export function resolveMatrixBotRoute(text: string, botNames: string[]): MatrixBotRoute {
+  const candidates = [...new Set(botNames.map((name) => name.trim()).filter(Boolean))]
+    .sort((a, b) => b.length - a.length)
+
+  for (const name of candidates) {
+    const localName = name.startsWith("@") ? name.slice(1).split(":", 1)[0] : name
+    const forms = [...new Set([name, localName, `@${localName}`])].sort((a, b) => b.length - a.length)
+    for (const form of forms) {
+      if (text.slice(0, form.length).toLowerCase() !== form.toLowerCase()) continue
+      let end = form.length
+      if (form === `@${localName}` && text.charAt(end) === ":") {
+        const fullUserId = text.slice(end + 1).match(/^[^\s:]+/)
+        if (fullUserId) end += fullUserId[0].length + 1
+      }
+      const separator = text.charAt(end)
+      if (separator !== ":" && !/\s/.test(separator)) continue
+      return {
+        target: localName.toLowerCase(),
+        query: text.slice(end).replace(/^[:\s]+/, "").trim(),
+      }
+    }
+  }
+
+  return { target: null, query: text.trim() }
+}
+
 /**
  * Resolve the thread root event ID.
  * If the event is in a thread, use the thread root. Otherwise use the event itself.

@@ -6,6 +6,7 @@ import { describe, test, expect } from "bun:test"
 import {
   extractThreadRootId,
   extractBotNameQuery,
+  resolveMatrixBotRoute,
   resolveThreadRoot,
   buildMatrixSessionId,
   normalizeMatrixEventContext,
@@ -77,6 +78,37 @@ describe("extractBotNameQuery", () => {
   test("requires a non-empty configured name and a separator", () => {
     expect(extractBotNameQuery("opencode: summarize this", "")).toBeNull()
     expect(extractBotNameQuery("opencode", "opencode")).toBeNull()
+  })
+})
+
+describe("resolveMatrixBotRoute", () => {
+  const bots = ["bridge-coordinator", "bridge-developer", "bridge-reviewer"]
+
+  test("routes a configured bot-name prefix exclusively", () => {
+    expect(resolveMatrixBotRoute("bridge-developer: implement T001", bots)).toEqual({
+      target: "bridge-developer",
+      query: "implement T001",
+    })
+  })
+
+  test("accepts local and full Matrix user IDs", () => {
+    expect(resolveMatrixBotRoute("@bridge-reviewer review T001", bots).target).toBe("bridge-reviewer")
+    expect(resolveMatrixBotRoute("@bridge-coordinator:matrix.example plan T001", bots)).toEqual({
+      target: "bridge-coordinator",
+      query: "plan T001",
+    })
+  })
+
+  test("does not treat unaddressed or partial names as targets", () => {
+    expect(resolveMatrixBotRoute("!oc plan T001", bots).target).toBeNull()
+    expect(resolveMatrixBotRoute("bridge-developer-extra: run", bots).target).toBeNull()
+  })
+
+  test("matches names case-insensitively", () => {
+    expect(resolveMatrixBotRoute("Bridge-Coordinator: plan", bots)).toEqual({
+      target: "bridge-coordinator",
+      query: "plan",
+    })
   })
 })
 

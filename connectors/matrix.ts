@@ -69,6 +69,7 @@ const SESSION_RETENTION_DAYS = parseInt(process.env.SESSION_RETENTION_DAYS || "7
 const THREAD_ISOLATION = config.matrix.threadIsolation
 const ENV_ALLOWED_USERS = parseCsvList(process.env.MATRIX_ALLOWED_USERS)
 const ALLOWED_USERS = ENV_ALLOWED_USERS.length > 0 ? ENV_ALLOWED_USERS : config.matrix.allowedUsers
+const MATRIX_BOT_NAMES = [BOT_NAME, ...config.matrix.peerBotNames]
 
 // Storage paths
 const STORAGE_PATH = process.env.MATRIX_STORAGE_PATH ||
@@ -85,6 +86,7 @@ export {
   type MatrixEventContext,
   extractThreadRootId,
   extractBotNameQuery,
+  resolveMatrixBotRoute,
   resolveThreadRoot,
   buildMatrixSessionId,
   normalizeMatrixEventContext,
@@ -95,6 +97,7 @@ import {
   type MatrixEventContext,
   extractThreadRootId,
   extractBotNameQuery,
+  resolveMatrixBotRoute,
   normalizeMatrixEventContext,
   buildThreadRelation,
   shouldHandleThreadReply,
@@ -389,6 +392,13 @@ export class MatrixConnector extends BaseConnector<RoomSession> {
     const body = message.textBody.trim()
     if (!body) return
 
+    const botRoute = resolveMatrixBotRoute(body, MATRIX_BOT_NAMES)
+    const ownBotName = BOT_NAME.trim().replace(/^@/, "").split(":", 1)[0].toLowerCase()
+    if (botRoute.target && botRoute.target !== ownBotName) {
+      this.log(`[ROUTE] Ignored event=${event.event_id || "unknown"} target=${botRoute.target} bot=${ownBotName}`)
+      return
+    }
+
     // Deduplicate events (Matrix sync replays)
     if (this.isDuplicateEvent(event.event_id || `${roomId}:${Date.now()}`)) return
 
@@ -413,9 +423,19 @@ export class MatrixConnector extends BaseConnector<RoomSession> {
     // Extract query
     let query = ""
     const botNameQuery = extractBotNameQuery(body, BOT_NAME)
-    if (body.startsWith(TRIGGER + " ")) {
+    if (botRoute.target === ownBotName) {
+      query = botRoute.query
+    } else if (body.startsWith(TRIGGER + " ")) {
+      if (!isDM && !config.matrix.handleUnaddressed) {
+        this.log(`[ROUTE] Ignored unaddressed event=${event.event_id || "unknown"} bot=${ownBotName}`)
+        return
+      }
       query = body.slice(TRIGGER.length + 1).trim()
     } else if (body.startsWith(TRIGGER)) {
+      if (!isDM && !config.matrix.handleUnaddressed) {
+        this.log(`[ROUTE] Ignored unaddressed event=${event.event_id || "unknown"} bot=${ownBotName}`)
+        return
+      }
       query = body.slice(TRIGGER.length).trim()
     } else if (body.includes(myUserId)) {
       query = body.replace(myUserId, "").trim()
@@ -423,7 +443,7 @@ export class MatrixConnector extends BaseConnector<RoomSession> {
       query = botNameQuery
     } else if (isDM) {
       query = body
-    } else if (this.threadIsolation && shouldHandleThreadReply({
+    } else if (this.threadIsolation && config.matrix.handleUnaddressed && shouldHandleThreadReply({
       text: body,
       threadRootEventId,
       trigger: TRIGGER,

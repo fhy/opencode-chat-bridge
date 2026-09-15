@@ -130,6 +130,8 @@ describe("config", () => {
       expect(config.matrix.homeserver).toBe("https://custom.server.org")
       expect(config.matrix.deviceId).toBe("OPENCODE_BRIDGE") // From default
       expect(config.matrix.autoJoin).toBe(true) // From default
+      expect(config.matrix.peerBotNames).toEqual([])
+      expect(config.matrix.handleUnaddressed).toBe(true)
     })
 
     test("normalizes invalid tool message settings", () => {

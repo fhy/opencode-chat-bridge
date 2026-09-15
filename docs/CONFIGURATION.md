@@ -540,6 +540,22 @@ to return a fixed friendly string).
 > channels where untrusted users can read the bot's replies. The detail is
 > bounded but not redacted.
 
+## Matrix Shared-Room Routing
+
+When multiple bridge bots share a room, configure each instance with the names of its peers. Explicit leading targets such as `bridge-developer: ...`, `@bridge-developer ...`, or a full Matrix user ID are then routed exclusively to that bot:
+
+```json
+{
+  "botName": "bridge-developer",
+  "matrix": {
+    "peerBotNames": ["bridge-coordinator", "bridge-reviewer"],
+    "handleUnaddressed": false
+  }
+}
+```
+
+Set `handleUnaddressed` on only one instance when generic group-room triggers and implicit thread replies should have a default recipient. Direct messages continue to work regardless of this setting. Leaving `peerBotNames` empty preserves single-bot behavior.
+
 ## Matrix HTML Formatting
 
 By default, bot responses are sent as plain text. When `formatHtml` is enabled,

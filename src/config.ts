@@ -25,6 +25,10 @@ export interface MatrixConfig {
   allowedUsers: string[]
   formatHtml: boolean
   threadIsolation: boolean  // true: per-thread sessions + thread replies, false: per-room
+  /** Other bot names sharing a room. A message addressed to one peer is ignored. */
+  peerBotNames: string[]
+  /** Handle group-room messages that use the generic trigger but name no bot. */
+  handleUnaddressed: boolean
 }
 
 export interface MattermostConfig {
@@ -202,6 +206,8 @@ const defaultConfig: ChatBridgeConfig = {
     allowedUsers: [],
     formatHtml: false,
     threadIsolation: true,  // Per-thread sessions by default
+    peerBotNames: [],
+    handleUnaddressed: true,
   },
   mattermost: {
     enabled: false,
