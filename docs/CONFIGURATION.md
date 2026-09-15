@@ -70,6 +70,23 @@ Ferrum is not a sandbox: an allowed tool or MCP server runs with the Unix permis
 
 For production chat bots, configure only trusted MCP commands, pass only required environment variables, keep credentials outside copied profiles and session stores, and prefer narrow MCP tools over enabling general shell access.
 
+### Codex backend notes
+
+[Codex ACP](https://github.com/agentclientprotocol/codex-acp) exposes Codex CLI as an ACP stdio agent and is compatible with the bridge's newline-delimited JSON-RPC transport:
+
+```json
+{
+  "acp": {
+    "command": "npx",
+    "args": ["-y", "@agentclientprotocol/codex-acp@1.11.0"],
+    "backendId": "codex-acp-1.11.0",
+    "profileDir": "./profiles/reviewer"
+  }
+}
+```
+
+Pin the adapter version and update `backendId` when changing to an incompatible release. The adapter can use an existing ChatGPT/Codex login or API-key environment variables. Keep login data and API keys outside the profile and session workspace. Initial package download can delay the first startup, so preinstall or prewarm the pinned package in production.
+
 ## Session picker
 
 The project/session picker is disabled by default because it exposes saved ACP working directories, session titles, and optional recent history previews.

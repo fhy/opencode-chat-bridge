@@ -145,6 +145,8 @@ deny = ["write", "edit", "bash"]
 
 The bridge/Ferrum integration supports per-thread workspaces, streaming text/thought updates, command discovery, cancellation, restart-safe resume/delete, and restrictive workspace policy. See [Configuration](docs/CONFIGURATION.md#ferrum-backend-notes).
 
+Codex CLI can be used through the `@agentclientprotocol/codex-acp` stdio adapter. See [Configuration](docs/CONFIGURATION.md#codex-backend-notes) for a pinned backend example and authentication notes.
+
 ## Docker
 
 Run with Docker (no Bun/Node installation needed):
