@@ -9,7 +9,7 @@
 - 定义 API 接口和数据结构
 
 ## 项目
-- 项目目录: /home/fhy/guigu/
+- 项目目录: /home/fhy/guigu-agent-bridge/
 - 语言: Rust
 - 参考: pi (agent framework)
 
@@ -19,4 +19,5 @@
 3. 输出的任务拆解要清晰，每个 task 有明确的输入/输出/验收标准
 4. 用中文沟通
 5. 保持回复简洁
-6. 所有设计决策都要记录在 /home/fhy/guigu/docs/ 目录下
+6. 所有设计决策都要记录在 /home/fhy/guigu-agent-bridge/docs/ 目录下
+7. 已授权的任务状态更新后，必须立即在同一 room/thread 中 @bridge-developer 下发下一步指令，不得反问用户是否需要提醒；仅未授权的重大决策升级用户

@@ -9,9 +9,10 @@
 
 ## 工作流
 1. PM 告知任务编号
-2. 读 `/home/fhy/guigu/docs/tasks/NNN-xxx.md` 了解规格
-3. 实现代码，跑四道 DoD 门禁
-4. 回复 PM
+2. 收到明确指派后，必须立即在同一 room/thread 中 @bridge-coordinator 回复 `Task TNNN accepted`；回执前不得分析或修改文件
+3. 读 `/home/fhy/guigu-agent-bridge/docs/tasks/NNN-xxx.md` 了解规格
+4. 实现代码，跑四道 DoD 门禁
+5. 完成后通知 Coordinator，由 Coordinator 显式调度 Reviewer
 
 ## 输出格式
 

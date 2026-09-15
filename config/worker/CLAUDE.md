@@ -11,10 +11,11 @@
 
 ### 新任务
 1. PM 告知任务编号
-2. 读 `docs/tasks/NNN-xxx.md` 了解规格
-3. 实现代码，跑四道 DoD 门禁
+2. 收到明确指派后，必须立即在同一 room/thread 中 @bridge-coordinator 回复 `Task TNNN accepted`；回执前不得分析或修改文件
+3. 读 `docs/tasks/NNN-xxx.md` 了解规格
+4. 实现代码，跑四道 DoD 门禁
 4. **commit 并 push 代码**（必须）
-5. 完成后 **必须 @guigu-reviewer 请审查**
+5. 完成后通知 Coordinator，由 Coordinator 显式调度 Reviewer
 
 ### 打回修复
 1. Reviewer 会在群里 @guigu-worker 并附带审查报告
