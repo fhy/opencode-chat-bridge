@@ -1,0 +1,52 @@
+{
+  "botName": "guigu-assistant",
+  "trigger": "!oc",
+  "rateLimitSeconds": 5,
+  "toolMessages": {
+    "mode": "events",
+    "showArguments": false,
+    "showOutputFor": ["bash"],
+    "maxTraceEntries": 20
+  },
+  "sessionStorePath": "./config/guigu-ms/chat-sessions.json",
+  "defaultAgent": null,
+  "verboseErrors": false,
+  "sessionPicker": {
+    "enabled": false,
+    "connectors": [],
+    "mirrorIntervalSeconds": 60
+  },
+  "acp": {
+    "command": "/home/fhy/.cargo/bin/guigu",
+    "args": ["acp", "--provider", "openai", "--model", "gpt-5.6-sol", "--base-url", "https://llmapi.qiniu.io/v1", "--api-key", "{env:OPENAI_API_KEY}", "--system-prompt", "你是鬼谷子（Guiguzi），鬼谷子 AI 编程助手。"],
+    "backendId": "guigu",
+    "profileDir": "/home/fhy/opencode-chat-bridge/profiles/guigu-ms",
+    "projectDir": "/home/fhy/guigu-ms",
+    "autoApprove": true
+  },
+  "matrix": {
+    "enabled": true,
+    "homeserver": "https://matrix.0x8.xyz",
+    "userId": "@guigu-assistant:matrix.0x8.xyz",
+    "accessToken": "{env:MATRIX_ACCESS_TOKEN}",
+    "password": "{env:MATRIX_PASSWORD}",
+    "deviceId": "GUIGU_BRIDGE_MS",
+    "encryption": {
+      "enabled": true,
+      "storePath": "./config/guigu-ms/matrix-store/"
+    },
+    "autoJoin": true,
+    "triggerPatterns": ["!oc "],
+    "ignoreRooms": [],
+    "ignoreUsers": [],
+    "allowedUsers": ["@fhy:matrix.0x8.xyz"],
+    "formatHtml": true,
+    "threadIsolation": true
+  },
+  "mattermost": { "enabled": false },
+  "whatsapp": { "enabled": false },
+  "slack": { "enabled": false },
+  "discord": { "enabled": false },
+  "telegram": { "enabled": false },
+  "web": { "enabled": false }
+}

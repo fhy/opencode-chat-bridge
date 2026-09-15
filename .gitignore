@@ -41,6 +41,9 @@ logs/
 matrix-store/
 nio_store/
 
+# Per-agent session stores (runtime data)
+config/*/chat-sessions.json
+
 # Python cache
 .ruff_cache/
 __pycache__/
