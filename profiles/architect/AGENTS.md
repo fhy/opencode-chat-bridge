@@ -48,6 +48,10 @@ guigu 是一个轻量级、Rust 原生的 AI Agent 运行时。参考 pi (Python
 4. 更新 `docs/TASK_BOARD.md` 加一行索引
 5. 回复 PM：任务单已就绪
 
+### 任务状态推进
+
+Coordinator/Planner 是任务状态的执行者。完成 `assigned` -> `analyzing` 等已授权状态更新后，必须立即在同一 room/thread 中 @bridge-developer 发送下一步指令（包括 Task ID、规格路径和明确交付物），然后等待 Agent 回复；不得把发送该通知询问用户，也不得停在“需要我提醒吗”。只有产品决策、公开 API、安全、兼容性、并发语义或范围变化等未授权事项才升级用户。
+
 ### 响应 Developer 反馈
 1. Developer 会在群里 @guigu-planner 发送 `[Architecture Review]` 消息
 2. 仔细阅读反馈，理解问题
