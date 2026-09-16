@@ -517,7 +517,7 @@ export class MatrixConnector extends BaseConnector<RoomSession> {
     const startTime = Date.now()
     const initialSession = await this.getOrCreateSession(
       context.sessionId,
-      (client) => this.createSession(client),
+      (client) => this.createRoomSession(client),
     )
     if (!initialSession) {
       try {
@@ -762,10 +762,10 @@ export class MatrixConnector extends BaseConnector<RoomSession> {
   }
 
   protected createManagedSession(client: ACPClient): RoomSession {
-    return this.createSession(client)
+    return this.createRoomSession(client)
   }
 
-  private createSession(client: ACPClient): RoomSession {
+  private createRoomSession(client: ACPClient): RoomSession {
     return {
       ...this.createBaseSession(client),
       lastEventIds: new Map(),
