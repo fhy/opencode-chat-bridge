@@ -642,6 +642,8 @@ export abstract class BaseConnector<TSession extends BaseSession> {
   private eventDeduplicator: EventDeduplicator
   /** Session IDs with an in-flight query -- never evict these */
   protected activeQueries = new Map<string, ActiveQueryHandle & { abort: () => void; aborted: boolean }>()
+  /** Prevent concurrent events for one thread from spawning duplicate ACP clients. */
+  private readonly sessionCreations = new Map<string, Promise<TSession | null>>()
   private nextActiveQueryId = 0
   private allowedUsers: Set<string> | null = null
   private expiryInterval: NodeJS.Timeout | null = null
@@ -857,9 +859,27 @@ export abstract class BaseConnector<TSession extends BaseSession> {
     id: string,
     createSessionData: (client: ACPClient) => TSession
   ): Promise<TSession | null> {
-    let session = this.sessionManager.get(id)
-    
-    if (!session) {
+    const existing = this.sessionManager.get(id)
+    if (existing) return existing
+
+    const pending = this.sessionCreations.get(id)
+    if (pending) return pending
+
+    const creation = this.createSession(id, createSessionData)
+    this.sessionCreations.set(id, creation)
+    try {
+      return await creation
+    } finally {
+      if (this.sessionCreations.get(id) === creation) this.sessionCreations.delete(id)
+    }
+  }
+
+  private async createSession(
+    id: string,
+    createSessionData: (client: ACPClient) => TSession
+  ): Promise<TSession | null> {
+    let session: TSession | undefined
+    {
       const sessionDir = getSessionDir(this.config.connector, id)
       ensureSessionDir(sessionDir)
       copyOpenCodeConfig(sessionDir)  // Apply security permissions
@@ -904,7 +924,7 @@ export abstract class BaseConnector<TSession extends BaseSession> {
       }
     }
     
-    return session
+    return session || null
   }
 
   /**
