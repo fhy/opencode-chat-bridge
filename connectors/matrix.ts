@@ -675,7 +675,7 @@ export class MatrixConnector extends BaseConnector<RoomSession> {
           this.log(`[ACP] Retrying once with a fresh client/session [${context.sessionId}]`)
           const retrySession = await this.recreateACPSession(
             context.sessionId,
-            (client) => this.createSession(client),
+            (client) => this.createRoomSession(client),
           )
           if (!retrySession) throw new Error("Failed to create a fresh ACP session for retry")
           session = retrySession
